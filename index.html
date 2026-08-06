@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>工业级双模播放器</title>
+  <style>
+    body { background: #000; color: #fff; font-family: sans-serif; padding: 16px; display: flex; flex-direction: column; align-items: center; }
+    .card { background: #1c1c1e; padding: 20px; border-radius: 16px; width: 100%; max-width: 380px; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.1); }
+    h3 { margin: 0 0 10px 0; font-size: 14px; color: #0a84ff; }
+    input[type="file"] { width: 100%; margin: 8px 0; color: #fff; }
+    .volume-box { display: flex; align-items: center; gap: 8px; margin: 8px 0; background: rgba(255,255,255,0.05); padding: 6px 10px; border-radius: 8px; }
+    .volume-box label { font-size: 12px; color: #aaa; min-width: 65px; }
+    .volume-box input[type="range"] { flex: 1; cursor: pointer; accent-color: #0071e3; margin: 0; }
+    .volume-box span { font-size: 11px; color: #30d158; min-width: 32px; text-align: right; }
+    button { width: 100%; padding: 10px; margin: 6px 0; background: #0071e3; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
+    button.off { background: #333; color: #aaa; }
+    button:disabled { opacity: 0.3; }
+    video { width: 100%; border-radius: 8px; margin-top: 8px; background: #000; }
+    .tip { font-size: 11px; color: #30d158; margin-top: 6px; }
+  </style>
+</head>
+<body>
+
+<!-- 模块 1：纯音频 -->
+<div class="card" id="audioCard">
+  <h3>🎵 独立音频区 (MP3 / WAV)</h3>
+  <input type="file" id="aFile" accept=".mp3,.wav">
+  <div class="volume-box">
+    <label>歌曲主音</label>
+    <input type="range" id="aMainVol" min="0" max="1" step="0.01" value="1">
+    <span id="aMainVal">100%</span>
+  </div>
+  <div class="volume-box">
+    <label>8D 音量</label>
+    <input type="range" id="a8dVol" min="0" max="1" step="0.01" value="1">
+    <span id="a8dVal">100%</span>
+  </div>
+  <button id="aPlay" disabled>播放音频</button>
+  <button id="aStop" disabled>停止音频</button>
+  <button id="aToggle" class="off" disabled>🌀 8D 环绕: 关闭</button>
+  <div class="tip" id="aStatus">等待选择音频...</div>
+</div>
+
+<!-- 模块 2：纯视频 -->
+<div class="card" id="videoCard">
+  <h3>🎬 独立视频区 (MP4)</h3>
+  <input type="file" id="vFile" accept=".mp4,.mov">
+  <video id="vEl" controls playsinline></video>
+  <div class="volume-box">
+    <label>视频主音</label>
+    <input type="range" id="vMainVol" min="0" max="1" step="0.01" value="1">
+    <span id="vMainVal">100%</span>
+  </div>
+  <div class="volume-box">
+    <label>8D 音量</label>
+    <input type="range" id="v8dVol" min="0" max="1" step="0.01" value="1">
+    <span id="v8dVal">100%</span>
+  </div>
+  <button id="vToggle" class="off" disabled>🌀 视频 8D 环绕: 关闭</button>
+  <div class="tip" id="vStatus">等待选择视频...</div>
+</div>
+
+<script>
+/**
+ * 工业级媒体 8D 与音量控制器
+ */
+class MediaController {
+  constructor(type) {
+    this.type = type; // 'audio' 或 'video'
+    this.ctx = null;
+    this.mainGain = null;
+    this.d8Gain = null;
+    this.panner = null;
+    this.is8D = false;
+    this.angle = 0;
+    this.animId = null;
+    this.initElements();
+  }
+
+  initElements() {
+    if (this.type === 'audio') {
+      this.fileInput = document.getElementById('aFile');
+      this.mainVolInput = document.getElementById('aMainVol');
+      this.mainValText = document.getElementById('aMainVal');
+      this.d8VolInput = document.getElementById('a8dVol');
+      this.d8ValText = document.getElementById('a8dVal');
+      this.playBtn = document.getElementById('aPlay');
+      this.stopBtn = document.getElementById('aStop');
+      this.toggleBtn = document.getElementById('aToggle');
+      this.statusEl = document.getElementById('aStatus');
+      this.audioBuffer = null;
+      this.sourceNode = null;
+    } else {
+      this.fileInput = document.getElementById('vFile');
+      this.mainVolInput = document.getElementById('vMainVol');
+      this.mainValText = document.getElementById('vMainVal');
+      this.d8VolInput = document.getElementById('v8dVol');
+      this.d8ValText = document.getElementById('v8dVal');
+      this.mediaEl = document.getElementById('vEl');
+      this.toggleBtn = document.getElementById('vToggle');
+      this.statusEl = document.getElementById('vStatus');
+      this.mediaElementNode = null;
+    }
+    this.bindEvents();
+  }
+
+  initAudioContext() {
+    if (!this.ctx) {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.mainGain = this.ctx.createGain();
+      this.d8Gain = this.ctx.createGain();
+      this.panner = this.ctx.createPanner();
+      this.panner.panningModel = 'HRTF';
+
+      // 拓扑结构：Source -> MainGain -> Panner -> 8DGain -> Destination
+      this.mainGain.connect(this.panner);
+      this.panner.connect(this.d8Gain);
+      this.d8Gain.connect(this.ctx.destination);
+    }
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+  }
+
+  setGainSmooth(param, value) {
+    if (!this.ctx) return;
+    // 使用工业级平滑过渡防止爆音
+    param.setTargetAtTime(Number(value), this.ctx.currentTime, 0.01);
+  }
+
+  bindEvents() {
+    // 主音量事件
+    this.mainVolInput.addEventListener('input', (e) => {
+      const val = e.target.value;
+      if (this.mainGain) this.setGainSmooth(this.mainGain.gain, val);
+      if (this.mediaEl) this.mediaEl.volume = val;
+      this.mainValText.textContent = Math.round(val * 100) + '%';
+    });
+
+    // 8D 音量事件
+    this.d8VolInput.addEventListener('input', (e) => {
+      const val = e.target.value;
+      if (this.d8Gain) this.setGainSmooth(this.d8Gain.gain, val);
+      this.d8ValText.textContent = Math.round(val * 100) + '%';
+    });
+
+    if (this.type === 'audio') {
+      this.fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        this.initAudioContext();
+        this.statusEl.textContent = "解码中...";
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          this.audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
+          this.playBtn.disabled = false;
+          this.stopBtn.disabled = false;
+          this.toggleBtn.disabled = false;
+          this.statusEl.textContent = "音频就绪";
+        } catch (err) {
+          this.statusEl.textContent = "解码失败";
+        }
+      });
+
+      this.playBtn.addEventListener('click', () => {
+        if (this.sourceNode) {
+          try { this.sourceNode.stop(); this.sourceNode.disconnect(); } catch(e){}
+        }
+        this.sourceNode = this.ctx.createBufferSource();
+        this.sourceNode.buffer = this.audioBuffer;
+        this.sourceNode.connect(this.mainGain);
+        this.sourceNode.start(0);
+        this.statusEl.textContent = "▶ 音频播放中";
+        if (this.is8D) this.startOrbit();
+      });
+
+      this.stopBtn.addEventListener('click', () => {
+        if (this.sourceNode) {
+          try { this.sourceNode.stop(); this.sourceNode.disconnect(); } catch(e){}
+          this.sourceNode = null;
+        }
+        this.stopOrbit();
+        this.statusEl.textContent = "已停止";
+      });
+
+      this.toggleBtn.addEventListener('click', () => this.toggle8D());
+
+    } else {
+      // 视频逻辑
+      this.fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        this.mediaEl.src = URL.createObjectURL(file);
+        this.mediaEl.load();
+        this.toggleBtn.disabled = false;
+        this.statusEl.textContent = "视频已加载";
+      });
+
+      this.mediaEl.addEventListener('play', () => {
+        this.initAudioContext();
+        if (!this.mediaElementNode) {
+          this.mediaElementNode = this.ctx.createMediaElementSource(this.mediaEl);
+          this.mediaElementNode.connect(this.mainGain);
+        }
+        if (this.is8D) this.startOrbit();
+        this.statusEl.textContent = "🎬 视频播放中 (带 8D)";
+      });
+
+      this.mediaEl.addEventListener('pause', () => {
+        this.stopOrbit();
+        this.statusEl.textContent = "视频已暂停";
+      });
+
+      this.toggleBtn.addEventListener('click', () => this.toggle8D());
+    }
+  }
+
+  toggle8D() {
+    this.is8D = !this.is8D;
+    this.toggleBtn.textContent = this.is8D ? `🌀 ${this.type==='video'?'视频 ':''}8D 环绕: 开启` : `🌀 ${this.type==='video'?'视频 ':''}8D 环绕: 关闭`;
+    this.toggleBtn.className = this.is8D ? "" : "off";
+
+    const isPlaying = this.type === 'audio' ? !!this.sourceNode : !this.mediaEl.paused;
+    if (this.is8D && isPlaying) {
+      this.startOrbit();
+    } else {
+      this.stopOrbit();
+    }
+  }
+
+  startOrbit() {
+    this.stopOrbit();
+    const orbit = () => {
+      if (!this.is8D) return;
+      this.angle += 0.04;
+      if (this.panner) {
+        this.panner.positionX.value = Math.cos(this.angle) * 2;
+        this.panner.positionZ.value = Math.sin(this.angle) * 2;
+      }
+      this.animId = requestAnimationFrame(orbit);
+    };
+    orbit();
+  }
+
+  stopOrbit() {
+    if (this.animId) {
+      cancelAnimationFrame(this.animId);
+      this.animId = null;
+    }
+    if (this.panner) {
+      this.panner.positionX.value = 0;
+      this.panner.positionZ.value = 1;
+    }
+  }
+}
+
+// 初始化双模播放器实例
+window.addEventListener('DOMContentLoaded', () => {
+  new MediaController('audio');
+  new MediaController('video');
+});
+</script>
+</body>
+</html>
