@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>双模播放器 - 极速稳定版</title>
+  <title>双模播放器 - 全音效完美联动版</title>
   <style>
     body { background: #0b0f0e; color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 12px; display: flex; flex-direction: column; gap: 14px; box-sizing: border-box; min-height: 100vh; overflow-y: auto; }
     
@@ -95,11 +95,24 @@
 
 <div class="card">
   <div class="card-header">
-    <h3>🎬 独立视频区 (MP4)</h3>
+    <h3>🎬 独立视频区 (MP4 + 全音效引擎)</h3>
+    <canvas id="vCanvas" class="visualizer" width="45" height="20"></canvas>
   </div>
   <input type="file" id="vFile" accept=".mp4,.mov">
   <video id="vEl" controls playsinline preload="metadata"></video>
   
+  <div class="select-box">
+    <label>🎬 音效风格：</label>
+    <select id="vPreset">
+      <option value="normal">标准原声 (Normal)</option>
+      <option value="bass">超重低音 (Bass Boost)</option>
+      <option value="vocal">清澈人声 (Vocal Clear)</option>
+      <option value="live">Live现场混响 (Concert Hall)</option>
+      <option value="vinyl">黑胶复古模拟 (Vinyl Warmth)</option>
+      <option value="space">8D 环绕动态 (8D Space)</option>
+    </select>
+  </div>
+
   <div class="control-row">
     <div class="btn-group">
       <button id="vLoop" class="off" disabled>🔁 循环: 关</button>
@@ -238,8 +251,10 @@ function drawAVisualizer() {
   }
 }
 
-// 视频逻辑（回归原生，丝滑秒开、100% 稳定有声音）
-const vFile = document.getElementById('vFile'), vEl = document.getElementById('vEl'), vLoop = document.getElementById('vLoop'), vStatus = document.getElementById('vStatus'), vVol = document.getElementById('vVol'), vVolVal = document.getElementById('vVolVal'), vSpeed = document.getElementById('vSpeed'), vSpeedVal = document.getElementById('vSpeedVal');
+// 视频逻辑（音视频节点全链路打通，确保 6 种音效和 8D 完美生效）
+let vCtx, vPanner, vGain, vAnalyser, vSourceNode, vEqLow, vEqMid, vEqHigh, vAnim, vAngle = 0, vCurrentPreset = 'normal';
+const vFile = document.getElementById('vFile'), vEl = document.getElementById('vEl'), vLoop = document.getElementById('vLoop'), vStatus = document.getElementById('vStatus'), vVol = document.getElementById('vVol'), vVolVal = document.getElementById('vVolVal'), vSpeed = document.getElementById('vSpeed'), vSpeedVal = document.getElementById('vSpeedVal'), vCanvas = document.getElementById('vCanvas'), vPreset = document.getElementById('vPreset');
+const vCanvasCtx = vCanvas.getContext('2d');
 
 vFile.addEventListener('change', e => {
   const f = e.target.files[0];
@@ -247,7 +262,12 @@ vFile.addEventListener('change', e => {
   vEl.src = URL.createObjectURL(f);
   vEl.load();
   vLoop.disabled = false;
-  vStatus.textContent = "视频已就绪，原生流畅播放";
+  vStatus.textContent = "视频已就绪，点击播放";
+});
+
+vPreset.addEventListener('change', e => {
+  vCurrentPreset = e.target.value;
+  if (vEqLow) applyPreset(vCurrentPreset, vEqLow, vEqMid, vEqHigh);
 });
 
 vLoop.addEventListener('click', () => {
@@ -256,14 +276,49 @@ vLoop.addEventListener('click', () => {
   vLoop.className = vEl.loop ? "" : "off";
 });
 
-vEl.addEventListener('play', () => { vStatus.textContent = "🎬 视频播放中"; });
-vEl.addEventListener('pause', () => { vStatus.textContent = "视频已暂停"; });
-vEl.addEventListener('ended', () => { vStatus.textContent = "视频播放完毕"; });
+vEl.addEventListener('play', () => {
+  if (!vCtx) {
+    vCtx = new (window.AudioContext || window.webkitAudioContext)();
+    vAnalyser = vCtx.createAnalyser(); vAnalyser.fftSize = 32;
+    vPanner = vCtx.createPanner(); vPanner.panningModel = 'HRTF';
+    vGain = vCtx.createGain(); vGain.gain.value = vVol.value / 100;
+    
+    vEqLow = vCtx.createBiquadFilter(); vEqLow.type = 'lowshelf'; vEqLow.frequency.value = 250;
+    vEqMid = vCtx.createBiquadFilter(); vEqMid.type = 'peaking'; vEqMid.frequency.value = 1500;
+    vEqHigh = vCtx.createBiquadFilter(); vEqHigh.type = 'highshelf'; vEqHigh.frequency.value = 4000;
+
+    vSourceNode = vCtx.createMediaElementSource(vEl);
+    vSourceNode.connect(vEqLow); 
+    vEqLow.connect(vEqMid); 
+    vEqMid.connect(vEqHigh); 
+    vEqHigh.connect(vPanner); 
+    vPanner.connect(vAnalyser); 
+    vAnalyser.connect(vGain); 
+    vGain.connect(vCtx.destination);
+  }
+  if (vCtx.state === 'suspended') vCtx.resume();
+  applyPreset(vCurrentPreset, vEqLow, vEqMid, vEqHigh);
+  runVOrbit();
+  drawVVisualizer();
+  vStatus.textContent = "🎬 视频播放中 [" + vPreset.options[vPreset.selectedIndex].text + "]";
+});
+
+vEl.addEventListener('pause', () => {
+  cancelAnimationFrame(vAnim);
+  vStatus.textContent = "视频已暂停";
+  vCanvasCtx.clearRect(0, 0, vCanvas.width, vCanvas.height);
+});
+
+vEl.addEventListener('ended', () => {
+  cancelAnimationFrame(vAnim);
+  vStatus.textContent = "视频播放完毕";
+  vCanvasCtx.clearRect(0, 0, vCanvas.width, vCanvas.height);
+});
 
 vVol.addEventListener('input', e => {
   const val = e.target.value;
   vVolVal.textContent = val + '%';
-  vEl.volume = val / 100;
+  if (vGain) vGain.gain.value = val / 100;
 });
 
 vSpeed.addEventListener('input', e => {
@@ -272,6 +327,32 @@ vSpeed.addEventListener('input', e => {
   vSpeedVal.textContent = speedRate.toFixed(1) + 'x';
   vEl.playbackRate = speedRate;
 });
+
+function runVOrbit() {
+  if (vEl.paused || vEl.ended) return;
+  if (vCurrentPreset === 'space') {
+    vAngle += 0.04;
+    if (vPanner) { vPanner.positionX.value = Math.cos(vAngle) * 2; vPanner.positionZ.value = Math.sin(vAngle) * 2; }
+  } else {
+    if (vPanner) { vPanner.positionX.value = 0; vPanner.positionZ.value = 1; }
+  }
+  vAnim = requestAnimationFrame(runVOrbit);
+}
+
+function drawVVisualizer() {
+  if (vEl.paused || vEl.ended) return;
+  requestAnimationFrame(drawVVisualizer);
+  const dataArray = new Uint8Array(vAnalyser.frequencyBinCount);
+  vAnalyser.getByteFrequencyData(dataArray);
+  vCanvasCtx.clearRect(0, 0, vCanvas.width, vCanvas.height);
+  const barWidth = 3; let x = 2;
+  for (let i = 0; i < 6; i++) {
+    let barHeight = (dataArray[i] / 255) * vCanvas.height;
+    vCanvasCtx.fillStyle = '#34d399';
+    vCanvasCtx.fillRect(x, vCanvas.height - barHeight, barWidth, barHeight);
+    x += 5;
+  }
+}
 </script>
 </body>
 </html>
