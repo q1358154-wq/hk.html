@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>双模播放器 - 音效专属音量/强度完美调节版</title>
+  <title>双模播放器 - 细节联动完美版</title>
   <style>
     body { background: #0b0f0e; color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 12px; display: flex; flex-direction: column; gap: 14px; box-sizing: border-box; min-height: 100vh; overflow-y: auto; }
     
@@ -45,6 +45,7 @@
 </head>
 <body>
 
+<!-- 独立音频区 -->
 <div class="card">
   <div class="card-header">
     <h3>🎵 独立音频区 (MP3 / WAV)</h3>
@@ -81,9 +82,10 @@
   <div class="tip" id="aStatus">等待选择音频...</div>
 </div>
 
+<!-- 独立视频区 -->
 <div class="card">
   <div class="card-header">
-    <h3>🎬 独立视频区 (MP4 + 音效专属音量联动)</h3>
+    <h3>🎬 独立视频区 (MP4 + 状态完美联动)</h3>
     <canvas id="vCanvas" class="visualizer" width="45" height="20"></canvas>
   </div>
   <input type="file" id="vFile" accept=".mp4,.mov">
@@ -117,10 +119,9 @@
 </div>
 
 <script>
-// 基础音效预设（结合音效专属音量强度调节）
 function applyPreset(preset, eqLow, eqMid, eqHigh, intensity) {
   eqLow.gain.value = 0; eqMid.gain.value = 0; eqHigh.gain.value = 0;
-  const mul = intensity / 100; // 根据“音效音量/强度”滑块实时缩放音效力度
+  const mul = intensity / 100;
   switch(preset) {
     case 'bass': eqLow.gain.value = 12 * mul; eqMid.gain.value = -2 * mul; eqHigh.gain.value = 2 * mul; break;
     case 'vocal': eqLow.gain.value = -3 * mul; eqMid.gain.value = 8 * mul; eqHigh.gain.value = 5 * mul; break;
@@ -158,6 +159,9 @@ aFile.addEventListener('change', async e => {
 aPreset.addEventListener('change', e => {
   aCurrentPreset = e.target.value;
   if (aEqLow) applyPreset(aCurrentPreset, aEqLow, aEqMid, aEqHigh, aFxVol.value);
+  if (aPlayState) {
+    aStatus.textContent = "▶ 播放中 [" + aPreset.options[aPreset.selectedIndex].text + "]";
+  }
 });
 
 aFxVol.addEventListener('input', e => {
@@ -252,9 +256,13 @@ vFile.addEventListener('change', e => {
   vStatus.textContent = "视频已就绪，点击播放";
 });
 
+// 【核心修复】下拉菜单切换时，实时联动更新状态栏文字
 vPreset.addEventListener('change', e => {
   vCurrentPreset = e.target.value;
   if (vEqLow) applyPreset(vCurrentPreset, vEqLow, vEqMid, vEqHigh, vFxVol.value);
+  if (!vEl.paused && !vEl.ended) {
+    vStatus.textContent = "🎬 视频播放中 [" + vPreset.options[vPreset.selectedIndex].text + "]";
+  }
 });
 
 vFxVol.addEventListener('input', e => {
@@ -309,7 +317,6 @@ vEl.addEventListener('ended', () => {
   vCanvasCtx.clearRect(0, 0, vCanvas.width, vCanvas.height);
 });
 
-// 总音量滑块
 vVol.addEventListener('input', e => {
   const val = e.target.value;
   vVolVal.textContent = val + '%';
