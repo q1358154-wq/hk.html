@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>完全独立双模播放器 - 无杂音丝滑版</title>
+  <title>完全独立双模播放器 - 终极全音效完美版</title>
   <style>
     body { background: #0b0f0e; color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 12px; display: flex; flex-direction: column; gap: 14px; box-sizing: border-box; min-height: 100vh; overflow-y: auto; }
     
@@ -120,16 +120,16 @@
     <div class="volume-box">
       <label>速度</label>
       <div class="vertical-slider-wrapper">
-        <input type="range" id="vSpeed" class="vertical" min="1" max="10" value="4">
+        <input type="range" id="vSpeed" class="vertical" min="5" max="20" value="10">
       </div>
-      <span id="vSpeedVal">0.04</span>
+      <span id="vSpeedVal">1.0x</span>
     </div>
     <div class="volume-box">
       <label>音量</label>
       <div class="vertical-slider-wrapper">
-        <input type="range" id="vVol" class="vertical" min="0" max="100" value="80">
+        <input type="range" id="vVol" class="vertical" min="0" max="100" value="100">
       </div>
-      <span id="vVolVal">80%</span>
+      <span id="vVolVal">100%</span>
     </div>
   </div>
   <div class="tip" id="vStatus">等待选择视频...</div>
@@ -193,7 +193,7 @@ aPlay.addEventListener('click', () => {
     if (!aLoopState && aPlayState) {
       aPlayState = false; cancelAnimationFrame(aAnim);
       aStatus.textContent = "播放完毕";
-      clearCanvas(aCanvasCtx, aCanvas);
+      aCanvasCtx.clearRect(0, 0, aCanvas.width, aCanvas.height);
     }
   };
 });
@@ -203,7 +203,7 @@ aStop.addEventListener('click', () => {
   aPlayState = false; cancelAnimationFrame(aAnim);
   if (aPanner) { aPanner.positionX.value = 0; aPanner.positionZ.value = 1; }
   aStatus.textContent = "已停止";
-  clearCanvas(aCanvasCtx, aCanvas);
+  aCanvasCtx.clearRect(0, 0, aCanvas.width, aCanvas.height);
 });
 
 aLoop.addEventListener('click', () => {
@@ -251,7 +251,7 @@ function drawAVisualizer() {
   }
 }
 
-// 视频逻辑（防杂音平滑处理）
+// 视频逻辑（安全平滑处理，完美加载且支持全部 6 种音效与 8D 环绕）
 let vCtx, vPanner, vGain, vAnalyser, vNode, vEqLow, vEqMid, vEqHigh, vAnim, vAngle = 0, vCurrentPreset = 'normal';
 const vFile = document.getElementById('vFile'), vEl = document.getElementById('vEl'), vLoop = document.getElementById('vLoop'), vStatus = document.getElementById('vStatus'), vVol = document.getElementById('vVol'), vVolVal = document.getElementById('vVolVal'), vSpeed = document.getElementById('vSpeed'), vSpeedVal = document.getElementById('vSpeedVal'), vCanvas = document.getElementById('vCanvas'), vPreset = document.getElementById('vPreset');
 const vCanvasCtx = vCanvas.getContext('2d');
@@ -259,14 +259,14 @@ const vCanvasCtx = vCanvas.getContext('2d');
 vFile.addEventListener('change', e => {
   const f = e.target.files[0];
   if (!f) return;
-  vStatus.textContent = "视频加载中，请稍候...";
+  vStatus.textContent = "视频加载中...";
   vEl.src = URL.createObjectURL(f);
   vEl.load();
 });
 
 vEl.addEventListener('loadeddata', () => {
   vLoop.disabled = false;
-  vStatus.textContent = "视频已就绪，可点击播放";
+  vStatus.textContent = "视频已就绪";
 });
 
 vPreset.addEventListener('change', e => {
@@ -285,8 +285,7 @@ vEl.addEventListener('play', () => {
     vCtx = new (window.AudioContext || window.webkitAudioContext)();
     vAnalyser = vCtx.createAnalyser(); vAnalyser.fftSize = 32;
     vPanner = vCtx.createPanner(); vPanner.panningModel = 'HRTF';
-    vGain = vCtx.createGain(); 
-    // 平滑初始音量，彻底消除开始播放时的爆音
+    vGain = vCtx.createGain();
     vGain.gain.setValueAtTime(0, vCtx.currentTime);
     vGain.gain.linearRampToValueAtTime(vVol.value / 100, vCtx.currentTime + 0.1);
     
@@ -301,32 +300,31 @@ vEl.addEventListener('play', () => {
   applyPreset(vCurrentPreset, vEqLow, vEqMid, vEqHigh);
   runVOrbit();
   drawVVisualizer();
-  vStatus.textContent = "🎬 视频播放中";
+  vStatus.textContent = "🎬 视频播放中 [" + vPreset.options[vPreset.selectedIndex].text + "]";
 });
 
 vEl.addEventListener('pause', () => {
   cancelAnimationFrame(vAnim);
   vStatus.textContent = "视频已暂停";
-  clearCanvas(vCanvasCtx, vCanvas);
+  vCanvasCtx.clearRect(0, 0, vCanvas.width, vCanvas.height);
 });
 
 vEl.addEventListener('ended', () => {
-  clearCanvas(vCanvasCtx, vCanvas);
+  vCanvasCtx.clearRect(0, 0, vCanvas.width, vCanvas.height);
   vStatus.textContent = "视频播放完毕";
 });
 
 vVol.addEventListener('input', e => {
   const val = e.target.value;
   vVolVal.textContent = val + '%';
-  if (vGain) {
-    vGain.gain.setValueAtTime(val / 100, vCtx.currentTime);
-  }
+  if (vGain) vGain.gain.setValueAtTime(val / 100, vCtx.currentTime);
 });
 
 vSpeed.addEventListener('input', e => {
   const val = e.target.value;
-  vSpeedStep = val * 0.01;
-  vSpeedVal.textContent = vSpeedStep.toFixed(2);
+  const speedRate = val * 0.1;
+  vSpeedVal.textContent = speedRate.toFixed(1) + 'x';
+  vEl.playbackRate = speedRate;
 });
 
 function runVOrbit() {
@@ -353,10 +351,6 @@ function drawVVisualizer() {
     vCanvasCtx.fillRect(x, vCanvas.height - barHeight, barWidth, barHeight);
     x += 5;
   }
-}
-
-function clearCanvas(ctx, canvas) {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 </script>
 </body>
