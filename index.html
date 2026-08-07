@@ -3,263 +3,309 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>工业级双模播放器</title>
+  <title>完全独立双模播放器 - 全屏Ins绿风版</title>
   <style>
-    body { background: #000; color: #fff; font-family: sans-serif; padding: 16px; display: flex; flex-direction: column; align-items: center; }
-    .card { background: #1c1c1e; padding: 20px; border-radius: 16px; width: 100%; max-width: 380px; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.1); }
-    h3 { margin: 0 0 10px 0; font-size: 14px; color: #0a84ff; }
-    input[type="file"] { width: 100%; margin: 8px 0; color: #fff; }
-    .volume-box { display: flex; align-items: center; gap: 8px; margin: 8px 0; background: rgba(255,255,255,0.05); padding: 6px 10px; border-radius: 8px; }
-    .volume-box label { font-size: 12px; color: #aaa; min-width: 65px; }
-    .volume-box input[type="range"] { flex: 1; cursor: pointer; accent-color: #0071e3; margin: 0; }
-    .volume-box span { font-size: 11px; color: #30d158; min-width: 32px; text-align: right; }
-    button { width: 100%; padding: 10px; margin: 6px 0; background: #0071e3; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
-    button.off { background: #333; color: #aaa; }
-    button:disabled { opacity: 0.3; }
-    video { width: 100%; border-radius: 8px; margin-top: 8px; background: #000; }
-    .tip { font-size: 11px; color: #30d158; margin-top: 6px; }
+    body { background: #0b0f0e; color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; width: 100vw; height: 100vh; box-sizing: border-box; overflow-y: auto; }
+    
+    .card { background: #131c18; padding: 16px; width: 100%; flex: 1; min-height: 50vh; margin-bottom: 0; border-bottom: 1px solid rgba(52, 211, 153, 0.15); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }
+    
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    h3 { margin: 0; font-size: 15px; color: #34d399; font-weight: 600; letter-spacing: 0.5px; }
+    
+    .visualizer { width: 50px; height: 22px; background: rgba(0,0,0,0.3); border-radius: 6px; display: block; border: 1px solid rgba(52, 211, 153, 0.1); }
+
+    input[type="file"] { width: 100%; margin: 6px 0; color: #a7f3d0; font-size: 12px; }
+    input[type="file"]::file-selector-button { background: #064e3b; color: #34d399; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 500; }
+
+    button { width: 100%; padding: 10px; margin: 4px 0; background: #059669; color: #fff; border: none; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 500; }
+    button.off { background: #1f2923; color: #6b7280; border: 1px solid rgba(255,255,255,0.05); }
+    button:disabled { opacity: 0.25; cursor: not-allowed; }
+    
+    video { width: 100%; max-height: 35vh; border-radius: 10px; margin-top: 6px; background: #000; border: 1px solid rgba(52, 211, 153, 0.1); object-fit: contain; }
+    .tip { font-size: 11px; color: #34d399; margin-top: 6px; opacity: 0.9; }
+    
+    .control-row { display: flex; gap: 10px; align-items: center; margin-top: 8px; }
+    .btn-group { flex: 1; display: flex; flex-direction: column; }
+    
+    .volume-box { width: 48px; background: rgba(52, 211, 153, 0.03); border: 1px solid rgba(52, 211, 153, 0.1); border-radius: 12px; display: flex; flex-direction: column; align-items: center; padding: 6px 0; justify-content: space-between; height: 140px; box-sizing: border-box; }
+    .volume-box label { font-size: 9px; color: #6ee7b7; margin-bottom: 2px; text-transform: uppercase; }
+    .volume-box span { font-size: 10px; font-weight: 600; color: #a7f3d0; margin-top: 2px; }
+    .vertical-slider-wrapper { height: 90px; display: flex; align-items: center; justify-content: center; }
+    input[type="range"].vertical {
+      writing-mode: bt-lr;
+      -webkit-appearance: slider-vertical;
+      width: 6px; height: 85px; padding: 0; margin: 0;
+      background: rgba(52, 211, 153, 0.15); outline: none; border-radius: 4px;
+    }
+    input[type="range"].vertical::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: #34d399; cursor: pointer;
+    }
   </style>
 </head>
 <body>
 
-<!-- 模块 1：纯音频 -->
-<div class="card" id="audioCard">
-  <h3>🎵 独立音频区 (MP3 / WAV)</h3>
+<div class="card">
+  <div class="card-header">
+    <h3>🎵 独立音频区 (MP3 / WAV)</h3>
+    <canvas id="aCanvas" class="visualizer" width="50" height="22"></canvas>
+  </div>
   <input type="file" id="aFile" accept=".mp3,.wav">
-  <div class="volume-box">
-    <label>歌曲主音</label>
-    <input type="range" id="aMainVol" min="0" max="1" step="0.01" value="1">
-    <span id="aMainVal">100%</span>
+  <div class="control-row">
+    <div class="btn-group">
+      <button id="aPlay" disabled>播放音频</button>
+      <button id="aStop" disabled>停止音频</button>
+      <button id="aLoop" class="off" disabled>🔁 循环播放: 关</button>
+      <button id="aToggle" class="off" disabled>🌀 8D 环绕: 关闭</button>
+    </div>
+    <div class="volume-box">
+      <label>8D速度</label>
+      <div class="vertical-slider-wrapper">
+        <input type="range" id="aSpeed" class="vertical" min="1" max="10" value="4">
+      </div>
+      <span id="aSpeedVal">0.04</span>
+    </div>
+    <div class="volume-box">
+      <label>音量</label>
+      <div class="vertical-slider-wrapper">
+        <input type="range" id="aVol" class="vertical" min="0" max="100" value="80">
+      </div>
+      <span id="aVolVal">80%</span>
+    </div>
   </div>
-  <div class="volume-box">
-    <label>8D 音量</label>
-    <input type="range" id="a8dVol" min="0" max="1" step="0.01" value="1">
-    <span id="a8dVal">100%</span>
-  </div>
-  <button id="aPlay" disabled>播放音频</button>
-  <button id="aStop" disabled>停止音频</button>
-  <button id="aToggle" class="off" disabled>🌀 8D 环绕: 关闭</button>
   <div class="tip" id="aStatus">等待选择音频...</div>
 </div>
 
-<!-- 模块 2：纯视频 -->
-<div class="card" id="videoCard">
-  <h3>🎬 独立视频区 (MP4)</h3>
+<div class="card">
+  <div class="card-header">
+    <h3>🎬 独立视频区 (MP4)</h3>
+    <canvas id="vCanvas" class="visualizer" width="50" height="22"></canvas>
+  </div>
   <input type="file" id="vFile" accept=".mp4,.mov">
   <video id="vEl" controls playsinline></video>
-  <div class="volume-box">
-    <label>视频主音</label>
-    <input type="range" id="vMainVol" min="0" max="1" step="0.01" value="1">
-    <span id="vMainVal">100%</span>
+  <div class="control-row" style="margin-top: 6px;">
+    <div class="btn-group">
+      <button id="vLoop" class="off" disabled>🔁 循环播放: 关</button>
+      <button id="vToggle" class="off" disabled>🌀 视频 8D: 关闭</button>
+    </div>
+    <div class="volume-box">
+      <label>8D速度</label>
+      <div class="vertical-slider-wrapper">
+        <input type="range" id="vSpeed" class="vertical" min="1" max="10" value="4">
+      </div>
+      <span id="vSpeedVal">0.04</span>
+    </div>
+    <div class="volume-box">
+      <label>音量</label>
+      <div class="vertical-slider-wrapper">
+        <input type="range" id="vVol" class="vertical" min="0" max="100" value="80">
+      </div>
+      <span id="vVolVal">80%</span>
+    </div>
   </div>
-  <div class="volume-box">
-    <label>8D 音量</label>
-    <input type="range" id="v8dVol" min="0" max="1" step="0.01" value="1">
-    <span id="v8dVal">100%</span>
-  </div>
-  <button id="vToggle" class="off" disabled>🌀 视频 8D 环绕: 关闭</button>
   <div class="tip" id="vStatus">等待选择视频...</div>
 </div>
 
 <script>
-/**
- * 工业级媒体 8D 与音量控制器
- */
-class MediaController {
-  constructor(type) {
-    this.type = type; // 'audio' 或 'video'
-    this.ctx = null;
-    this.mainGain = null;
-    this.d8Gain = null;
-    this.panner = null;
-    this.is8D = false;
-    this.angle = 0;
-    this.animId = null;
-    this.initElements();
+let aCtx, aPanner, aGain, aAnalyser, aBuf, aSrc, aPlayState = false, a8d = false, aAngle = 0, aAnim, aLoopState = false, aSpeedStep = 0.04;
+const aFile = document.getElementById('aFile'), aPlay = document.getElementById('aPlay'), aStop = document.getElementById('aStop'), aLoop = document.getElementById('aLoop'), aToggle = document.getElementById('aToggle'), aStatus = document.getElementById('aStatus'), aVol = document.getElementById('aVol'), aVolVal = document.getElementById('aVolVal'), aSpeed = document.getElementById('aSpeed'), aSpeedVal = document.getElementById('aSpeedVal'), aCanvas = document.getElementById('aCanvas');
+const aCanvasCtx = aCanvas.getContext('2d');
+
+aFile.addEventListener('change', async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  if (!aCtx) {
+    aCtx = new (window.AudioContext || window.webkitAudioContext)();
+    aAnalyser = aCtx.createAnalyser();
+    aAnalyser.fftSize = 32;
+    aPanner = aCtx.createPanner(); aPanner.panningModel = 'HRTF';
+    aGain = aCtx.createGain(); aGain.gain.value = aVol.value / 100;
+    aPanner.connect(aAnalyser);
+    aAnalyser.connect(aGain); 
+    aGain.connect(aCtx.destination);
   }
+  if (aCtx.state === 'suspended') aCtx.resume();
+  aStatus.textContent = "解码中...";
+  aBuf = await aCtx.decodeAudioData(await f.arrayBuffer());
+  aPlay.disabled = false; aStop.disabled = false; aLoop.disabled = false; aToggle.disabled = false;
+  aStatus.textContent = "音频就绪";
+});
 
-  initElements() {
-    if (this.type === 'audio') {
-      this.fileInput = document.getElementById('aFile');
-      this.mainVolInput = document.getElementById('aMainVol');
-      this.mainValText = document.getElementById('aMainVal');
-      this.d8VolInput = document.getElementById('a8dVol');
-      this.d8ValText = document.getElementById('a8dVal');
-      this.playBtn = document.getElementById('aPlay');
-      this.stopBtn = document.getElementById('aStop');
-      this.toggleBtn = document.getElementById('aToggle');
-      this.statusEl = document.getElementById('aStatus');
-      this.audioBuffer = null;
-      this.sourceNode = null;
-    } else {
-      this.fileInput = document.getElementById('vFile');
-      this.mainVolInput = document.getElementById('vMainVol');
-      this.mainValText = document.getElementById('vMainVal');
-      this.d8VolInput = document.getElementById('v8dVol');
-      this.d8ValText = document.getElementById('v8dVal');
-      this.mediaEl = document.getElementById('vEl');
-      this.toggleBtn = document.getElementById('vToggle');
-      this.statusEl = document.getElementById('vStatus');
-      this.mediaElementNode = null;
+aPlay.addEventListener('click', () => {
+  if (aSrc) { aSrc.stop(); aSrc.disconnect(); }
+  aSrc = aCtx.createBufferSource(); 
+  aSrc.buffer = aBuf;
+  aSrc.loop = aLoopState;
+  aSrc.connect(aPanner); 
+  aSrc.start(0);
+  aPlayState = true; 
+  aStatus.textContent = "▶ 音频播放中";
+  if (a8d) runAOrbit();
+  drawAVisualizer();
+
+  aSrc.onended = () => {
+    if (!aLoopState && aPlayState) {
+      aPlayState = false;
+      cancelAnimationFrame(aAnim);
+      if (aPanner) { aPanner.positionX.value = 0; aPanner.positionZ.value = 1; }
+      aStatus.textContent = "音频播放完毕";
+      clearCanvas(aCanvasCtx, aCanvas);
     }
-    this.bindEvents();
-  }
+  };
+});
 
-  initAudioContext() {
-    if (!this.ctx) {
-      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-      this.mainGain = this.ctx.createGain();
-      this.d8Gain = this.ctx.createGain();
-      this.panner = this.ctx.createPanner();
-      this.panner.panningModel = 'HRTF';
+aStop.addEventListener('click', () => {
+  if (aSrc) { aSrc.stop(); aSrc.disconnect(); aSrc = null; }
+  aPlayState = false; cancelAnimationFrame(aAnim);
+  if (aPanner) { aPanner.positionX.value = 0; aPanner.positionZ.value = 1; }
+  aStatus.textContent = "已停止";
+  clearCanvas(aCanvasCtx, aCanvas);
+});
 
-      // 拓扑结构：Source -> MainGain -> Panner -> 8DGain -> Destination
-      this.mainGain.connect(this.panner);
-      this.panner.connect(this.d8Gain);
-      this.d8Gain.connect(this.ctx.destination);
-    }
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
-    }
-  }
+aLoop.addEventListener('click', () => {
+  aLoopState = !aLoopState;
+  aLoop.textContent = aLoopState ? "🔁 循环播放: 开" : "🔁 循环播放: 关";
+  aLoop.className = aLoopState ? "" : "off";
+  if (aSrc) { aSrc.loop = aLoopState; }
+});
 
-  setGainSmooth(param, value) {
-    if (!this.ctx) return;
-    // 使用工业级平滑过渡防止爆音
-    param.setTargetAtTime(Number(value), this.ctx.currentTime, 0.01);
-  }
+aToggle.addEventListener('click', () => {
+  a8d = !a8d;
+  aToggle.textContent = a8d ? "🌀 8D 环绕: 开启" : "🌀 8D 环绕: 关闭";
+  aToggle.className = a8d ? "" : "off";
+  if (a8d && aPlayState) runAOrbit();
+  else { cancelAnimationFrame(aAnim); if (aPanner) { aPanner.positionX.value = 0; aPanner.positionZ.value = 1; } }
+});
 
-  bindEvents() {
-    // 主音量事件
-    this.mainVolInput.addEventListener('input', (e) => {
-      const val = e.target.value;
-      if (this.mainGain) this.setGainSmooth(this.mainGain.gain, val);
-      if (this.mediaEl) this.mediaEl.volume = val;
-      this.mainValText.textContent = Math.round(val * 100) + '%';
-    });
+aVol.addEventListener('input', e => {
+  const val = e.target.value;
+  aVolVal.textContent = val + '%';
+  if (aGain) aGain.gain.value = val / 100;
+});
 
-    // 8D 音量事件
-    this.d8VolInput.addEventListener('input', (e) => {
-      const val = e.target.value;
-      if (this.d8Gain) this.setGainSmooth(this.d8Gain.gain, val);
-      this.d8ValText.textContent = Math.round(val * 100) + '%';
-    });
+aSpeed.addEventListener('input', e => {
+  const val = e.target.value;
+  aSpeedStep = val * 0.01;
+  aSpeedVal.textContent = aSpeedStep.toFixed(2);
+});
 
-    if (this.type === 'audio') {
-      this.fileInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        this.initAudioContext();
-        this.statusEl.textContent = "解码中...";
-        try {
-          const arrayBuffer = await file.arrayBuffer();
-          this.audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
-          this.playBtn.disabled = false;
-          this.stopBtn.disabled = false;
-          this.toggleBtn.disabled = false;
-          this.statusEl.textContent = "音频就绪";
-        } catch (err) {
-          this.statusEl.textContent = "解码失败";
-        }
-      });
+function runAOrbit() {
+  if (!a8d) return;
+  aAngle += aSpeedStep;
+  if (aPanner) { aPanner.positionX.value = Math.cos(aAngle) * 2; aPanner.positionZ.value = Math.sin(aAngle) * 2; }
+  aAnim = requestAnimationFrame(runAOrbit);
+}
 
-      this.playBtn.addEventListener('click', () => {
-        if (this.sourceNode) {
-          try { this.sourceNode.stop(); this.sourceNode.disconnect(); } catch(e){}
-        }
-        this.sourceNode = this.ctx.createBufferSource();
-        this.sourceNode.buffer = this.audioBuffer;
-        this.sourceNode.connect(this.mainGain);
-        this.sourceNode.start(0);
-        this.statusEl.textContent = "▶ 音频播放中";
-        if (this.is8D) this.startOrbit();
-      });
-
-      this.stopBtn.addEventListener('click', () => {
-        if (this.sourceNode) {
-          try { this.sourceNode.stop(); this.sourceNode.disconnect(); } catch(e){}
-          this.sourceNode = null;
-        }
-        this.stopOrbit();
-        this.statusEl.textContent = "已停止";
-      });
-
-      this.toggleBtn.addEventListener('click', () => this.toggle8D());
-
-    } else {
-      // 视频逻辑
-      this.fileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        this.mediaEl.src = URL.createObjectURL(file);
-        this.mediaEl.load();
-        this.toggleBtn.disabled = false;
-        this.statusEl.textContent = "视频已加载";
-      });
-
-      this.mediaEl.addEventListener('play', () => {
-        this.initAudioContext();
-        if (!this.mediaElementNode) {
-          this.mediaElementNode = this.ctx.createMediaElementSource(this.mediaEl);
-          this.mediaElementNode.connect(this.mainGain);
-        }
-        if (this.is8D) this.startOrbit();
-        this.statusEl.textContent = "🎬 视频播放中 (带 8D)";
-      });
-
-      this.mediaEl.addEventListener('pause', () => {
-        this.stopOrbit();
-        this.statusEl.textContent = "视频已暂停";
-      });
-
-      this.toggleBtn.addEventListener('click', () => this.toggle8D());
-    }
-  }
-
-  toggle8D() {
-    this.is8D = !this.is8D;
-    this.toggleBtn.textContent = this.is8D ? `🌀 ${this.type==='video'?'视频 ':''}8D 环绕: 开启` : `🌀 ${this.type==='video'?'视频 ':''}8D 环绕: 关闭`;
-    this.toggleBtn.className = this.is8D ? "" : "off";
-
-    const isPlaying = this.type === 'audio' ? !!this.sourceNode : !this.mediaEl.paused;
-    if (this.is8D && isPlaying) {
-      this.startOrbit();
-    } else {
-      this.stopOrbit();
-    }
-  }
-
-  startOrbit() {
-    this.stopOrbit();
-    const orbit = () => {
-      if (!this.is8D) return;
-      this.angle += 0.04;
-      if (this.panner) {
-        this.panner.positionX.value = Math.cos(this.angle) * 2;
-        this.panner.positionZ.value = Math.sin(this.angle) * 2;
-      }
-      this.animId = requestAnimationFrame(orbit);
-    };
-    orbit();
-  }
-
-  stopOrbit() {
-    if (this.animId) {
-      cancelAnimationFrame(this.animId);
-      this.animId = null;
-    }
-    if (this.panner) {
-      this.panner.positionX.value = 0;
-      this.panner.positionZ.value = 1;
-    }
+function drawAVisualizer() {
+  if (!aPlayState) return;
+  requestAnimationFrame(drawAVisualizer);
+  const dataArray = new Uint8Array(aAnalyser.frequencyBinCount);
+  aAnalyser.getByteFrequencyData(dataArray);
+  aCanvasCtx.clearRect(0, 0, aCanvas.width, aCanvas.height);
+  const barWidth = 3;
+  let x = 2;
+  for (let i = 0; i < 6; i++) {
+    let barHeight = (dataArray[i] / 255) * aCanvas.height;
+    aCanvasCtx.fillStyle = '#34d399';
+    aCanvasCtx.fillRect(x, aCanvas.height - barHeight, barWidth, barHeight);
+    x += 5;
   }
 }
 
-// 初始化双模播放器实例
-window.addEventListener('DOMContentLoaded', () => {
-  new MediaController('audio');
-  new MediaController('video');
+let vCtx, vPanner, vGain, vAnalyser, vNode, v8d = false, vAngle = 0, vAnim, vSpeedStep = 0.04;
+const vFile = document.getElementById('vFile'), vEl = document.getElementById('vEl'), vLoop = document.getElementById('vLoop'), vToggle = document.getElementById('vToggle'), vStatus = document.getElementById('vStatus'), vVol = document.getElementById('vVol'), vVolVal = document.getElementById('vVolVal'), vSpeed = document.getElementById('vSpeed'), vSpeedVal = document.getElementById('vSpeedVal'), vCanvas = document.getElementById('vCanvas');
+const vCanvasCtx = vCanvas.getContext('2d');
+
+vFile.addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  vEl.src = URL.createObjectURL(f);
+  vEl.load(); vLoop.disabled = false; vToggle.disabled = false;
+  vStatus.textContent = "视频已加载";
 });
+
+vLoop.addEventListener('click', () => {
+  vEl.loop = !vEl.loop;
+  vLoop.textContent = vEl.loop ? "🔁 循环播放: 开" : "🔁 循环播放: 关";
+  vLoop.className = vEl.loop ? "" : "off";
+});
+
+vEl.addEventListener('play', () => {
+  if (!vCtx) {
+    vCtx = new (window.AudioContext || window.webkitAudioContext)();
+    vAnalyser = vCtx.createAnalyser();
+    vAnalyser.fftSize = 32;
+    vPanner = vCtx.createPanner(); vPanner.panningModel = 'HRTF';
+    vGain = vCtx.createGain(); vGain.gain.value = vVol.value / 100;
+    vNode = vCtx.createMediaElementSource(vEl);
+    vNode.connect(vPanner); 
+    vPanner.connect(vAnalyser);
+    vAnalyser.connect(vGain); 
+    vGain.connect(vCtx.destination);
+  }
+  if (vCtx.state === 'suspended') vCtx.resume();
+  if (v8d) runVOrbit();
+  drawVVisualizer();
+  vStatus.textContent = "🎬 视频播放中 (带 8D)";
+});
+
+vEl.addEventListener('pause', () => {
+  cancelAnimationFrame(vAnim);
+  vStatus.textContent = "视频已暂停";
+  clearCanvas(vCanvasCtx, vCanvas);
+});
+
+vEl.addEventListener('ended', () => {
+  clearCanvas(vCanvasCtx, vCanvas);
+});
+
+vToggle.addEventListener('click', () => {
+  v8d = !v8d;
+  vToggle.textContent = v8d ? "🌀 视频 8D: 开启" : "🌀 视频 8D: 关闭";
+  vToggle.className = v8d ? "" : "off";
+  if (v8d && !vEl.paused) runVOrbit();
+  else { cancelAnimationFrame(vAnim); if (vPanner) { vPanner.positionX.value = 0; vPanner.positionZ.value = 1; } }
+});
+
+vVol.addEventListener('input', e => {
+  const val = e.target.value;
+  vVolVal.textContent = val + '%';
+  if (vGain) vGain.gain.value = val / 100;
+});
+
+vSpeed.addEventListener('input', e => {
+  const val = e.target.value;
+  vSpeedStep = val * 0.01;
+  vSpeedVal.textContent = vSpeedStep.toFixed(2);
+});
+
+function runVOrbit() {
+  if (!v8d) return;
+  vAngle += vSpeedStep;
+  if (vPanner) { vPanner.positionX.value = Math.cos(vAngle) * 2; vPanner.positionZ.value = Math.sin(vAngle) * 2; }
+  vAnim = requestAnimationFrame(runVOrbit);
+}
+
+function drawVVisualizer() {
+  if (vEl.paused || vEl.ended) return;
+  requestAnimationFrame(drawVVisualizer);
+  const dataArray = new Uint8Array(vAnalyser.frequencyBinCount);
+  vAnalyser.getByteFrequencyData(dataArray);
+  vCanvasCtx.clearRect(0, 0, vCanvas.width, vCanvas.height);
+  const barWidth = 3;
+  let x = 2;
+  for (let i = 0; i < 6; i++) {
+    let barHeight = (dataArray[i] / 255) * vCanvas.height;
+    vCanvasCtx.fillStyle = '#34d399';
+    vCanvasCtx.fillRect(x, vCanvas.height - barHeight, barWidth, barHeight);
+    x += 5;
+  }
+}
+
+function clearCanvas(ctx, canvas) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
 </script>
 </body>
 </html>
