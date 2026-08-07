@@ -3,43 +3,43 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>完全独立双模播放器 - 全屏Ins绿风版</title>
+  <title>完全独立双模播放器 - Ins绿风舒适版</title>
   <style>
-    body { background: #0b0f0e; color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; width: 100vw; height: 100vh; box-sizing: border-box; overflow-y: auto; }
+    body { background: #0b0f0e; color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 12px; display: flex; flex-direction: column; gap: 14px; box-sizing: border-box; min-height: 100vh; overflow-y: auto; }
     
-    .card { background: #131c18; padding: 16px; width: 100%; flex: 1; min-height: 50vh; margin-bottom: 0; border-bottom: 1px solid rgba(52, 211, 153, 0.15); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }
+    .card { background: #131c18; padding: 14px; border-radius: 14px; border: 1px solid rgba(52, 211, 153, 0.15); box-sizing: border-box; display: flex; flex-direction: column; }
     
     .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-    h3 { margin: 0; font-size: 15px; color: #34d399; font-weight: 600; letter-spacing: 0.5px; }
+    h3 { margin: 0; font-size: 14px; color: #34d399; font-weight: 600; letter-spacing: 0.5px; }
     
-    .visualizer { width: 50px; height: 22px; background: rgba(0,0,0,0.3); border-radius: 6px; display: block; border: 1px solid rgba(52, 211, 153, 0.1); }
+    .visualizer { width: 45px; height: 20px; background: rgba(0,0,0,0.3); border-radius: 6px; display: block; border: 1px solid rgba(52, 211, 153, 0.1); }
 
-    input[type="file"] { width: 100%; margin: 6px 0; color: #a7f3d0; font-size: 12px; }
+    input[type="file"] { width: 100%; margin-bottom: 10px; color: #a7f3d0; font-size: 12px; }
     input[type="file"]::file-selector-button { background: #064e3b; color: #34d399; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 500; }
 
-    button { width: 100%; padding: 10px; margin: 4px 0; background: #059669; color: #fff; border: none; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 500; }
+    button { width: 100%; padding: 9px; margin: 3px 0; background: #059669; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500; }
     button.off { background: #1f2923; color: #6b7280; border: 1px solid rgba(255,255,255,0.05); }
     button:disabled { opacity: 0.25; cursor: not-allowed; }
     
-    video { width: 100%; max-height: 35vh; border-radius: 10px; margin-top: 6px; background: #000; border: 1px solid rgba(52, 211, 153, 0.1); object-fit: contain; }
-    .tip { font-size: 11px; color: #34d399; margin-top: 6px; opacity: 0.9; }
+    video { width: 100%; max-height: 28vh; border-radius: 8px; margin-bottom: 10px; background: #000; border: 1px solid rgba(52, 211, 153, 0.1); object-fit: contain; }
+    .tip { font-size: 11px; color: #34d399; margin-top: 8px; opacity: 0.9; }
     
-    .control-row { display: flex; gap: 10px; align-items: center; margin-top: 8px; }
+    .control-row { display: flex; gap: 8px; align-items: center; }
     .btn-group { flex: 1; display: flex; flex-direction: column; }
     
-    .volume-box { width: 48px; background: rgba(52, 211, 153, 0.03); border: 1px solid rgba(52, 211, 153, 0.1); border-radius: 12px; display: flex; flex-direction: column; align-items: center; padding: 6px 0; justify-content: space-between; height: 140px; box-sizing: border-box; }
-    .volume-box label { font-size: 9px; color: #6ee7b7; margin-bottom: 2px; text-transform: uppercase; }
-    .volume-box span { font-size: 10px; font-weight: 600; color: #a7f3d0; margin-top: 2px; }
-    .vertical-slider-wrapper { height: 90px; display: flex; align-items: center; justify-content: center; }
+    .volume-box { width: 44px; background: rgba(52, 211, 153, 0.03); border: 1px solid rgba(52, 211, 153, 0.1); border-radius: 10px; display: flex; flex-direction: column; align-items: center; padding: 6px 0; justify-content: space-between; height: 125px; box-sizing: border-box; }
+    .volume-box label { font-size: 8px; color: #6ee7b7; margin-bottom: 2px; text-transform: uppercase; }
+    .volume-box span { font-size: 9px; font-weight: 600; color: #a7f3d0; margin-top: 2px; }
+    .vertical-slider-wrapper { height: 75px; display: flex; align-items: center; justify-content: center; }
     input[type="range"].vertical {
       writing-mode: bt-lr;
       -webkit-appearance: slider-vertical;
-      width: 6px; height: 85px; padding: 0; margin: 0;
+      width: 6px; height: 70px; padding: 0; margin: 0;
       background: rgba(52, 211, 153, 0.15); outline: none; border-radius: 4px;
     }
     input[type="range"].vertical::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 12px; height: 12px; border-radius: 50%;
+      width: 10px; height: 10px; border-radius: 50%;
       background: #34d399; cursor: pointer;
     }
   </style>
@@ -49,18 +49,18 @@
 <div class="card">
   <div class="card-header">
     <h3>🎵 独立音频区 (MP3 / WAV)</h3>
-    <canvas id="aCanvas" class="visualizer" width="50" height="22"></canvas>
+    <canvas id="aCanvas" class="visualizer" width="45" height="20"></canvas>
   </div>
   <input type="file" id="aFile" accept=".mp3,.wav">
   <div class="control-row">
     <div class="btn-group">
       <button id="aPlay" disabled>播放音频</button>
       <button id="aStop" disabled>停止音频</button>
-      <button id="aLoop" class="off" disabled>🔁 循环播放: 关</button>
-      <button id="aToggle" class="off" disabled>🌀 8D 环绕: 关闭</button>
+      <button id="aLoop" class="off" disabled>🔁 循环: 关</button>
+      <button id="aToggle" class="off" disabled>🌀 8D环绕: 关</button>
     </div>
     <div class="volume-box">
-      <label>8D速度</label>
+      <label>速度</label>
       <div class="vertical-slider-wrapper">
         <input type="range" id="aSpeed" class="vertical" min="1" max="10" value="4">
       </div>
@@ -80,17 +80,17 @@
 <div class="card">
   <div class="card-header">
     <h3>🎬 独立视频区 (MP4)</h3>
-    <canvas id="vCanvas" class="visualizer" width="50" height="22"></canvas>
+    <canvas id="vCanvas" class="visualizer" width="45" height="20"></canvas>
   </div>
   <input type="file" id="vFile" accept=".mp4,.mov">
   <video id="vEl" controls playsinline></video>
-  <div class="control-row" style="margin-top: 6px;">
+  <div class="control-row">
     <div class="btn-group">
-      <button id="vLoop" class="off" disabled>🔁 循环播放: 关</button>
-      <button id="vToggle" class="off" disabled>🌀 视频 8D: 关闭</button>
+      <button id="vLoop" class="off" disabled>🔁 循环: 关</button>
+      <button id="vToggle" class="off" disabled>🌀 8D环绕: 关</button>
     </div>
     <div class="volume-box">
-      <label>8D速度</label>
+      <label>速度</label>
       <div class="vertical-slider-wrapper">
         <input type="range" id="vSpeed" class="vertical" min="1" max="10" value="4">
       </div>
@@ -165,14 +165,14 @@ aStop.addEventListener('click', () => {
 
 aLoop.addEventListener('click', () => {
   aLoopState = !aLoopState;
-  aLoop.textContent = aLoopState ? "🔁 循环播放: 开" : "🔁 循环播放: 关";
+  aLoop.textContent = aLoopState ? "🔁 循环: 开" : "🔁 循环: 关";
   aLoop.className = aLoopState ? "" : "off";
   if (aSrc) { aSrc.loop = aLoopState; }
 });
 
 aToggle.addEventListener('click', () => {
   a8d = !a8d;
-  aToggle.textContent = a8d ? "🌀 8D 环绕: 开启" : "🌀 8D 环绕: 关闭";
+  aToggle.textContent = a8d ? "🌀 8D环绕: 开" : "🌀 8D环绕: 关";
   aToggle.className = a8d ? "" : "off";
   if (a8d && aPlayState) runAOrbit();
   else { cancelAnimationFrame(aAnim); if (aPanner) { aPanner.positionX.value = 0; aPanner.positionZ.value = 1; } }
@@ -227,7 +227,7 @@ vFile.addEventListener('change', e => {
 
 vLoop.addEventListener('click', () => {
   vEl.loop = !vEl.loop;
-  vLoop.textContent = vEl.loop ? "🔁 循环播放: 开" : "🔁 循环播放: 关";
+  vLoop.textContent = vEl.loop ? "🔁 循环: 开" : "🔁 循环: 关";
   vLoop.className = vEl.loop ? "" : "off";
 });
 
@@ -262,7 +262,7 @@ vEl.addEventListener('ended', () => {
 
 vToggle.addEventListener('click', () => {
   v8d = !v8d;
-  vToggle.textContent = v8d ? "🌀 视频 8D: 开启" : "🌀 视频 8D: 关闭";
+  vToggle.textContent = v8d ? "🌀 8D环绕: 开" : "🌀 8D环绕: 关";
   vToggle.className = v8d ? "" : "off";
   if (v8d && !vEl.paused) runVOrbit();
   else { cancelAnimationFrame(vAnim); if (vPanner) { vPanner.positionX.value = 0; vPanner.positionZ.value = 1; } }
