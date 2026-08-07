@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>完全独立双模播放器 - 多音效全功能版</title>
+  <title>完全独立双模播放器 - 无杂音丝滑版</title>
   <style>
     body { background: #0b0f0e; color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 12px; display: flex; flex-direction: column; gap: 14px; box-sizing: border-box; min-height: 100vh; overflow-y: auto; }
     
@@ -50,7 +50,6 @@
 </head>
 <body>
 
-<!-- 音频区 -->
 <div class="card">
   <div class="card-header">
     <h3>🎵 独立音频区 (MP3 / WAV)</h3>
@@ -94,14 +93,13 @@
   <div class="tip" id="aStatus">等待选择音频...</div>
 </div>
 
-<!-- 视频区 -->
 <div class="card">
   <div class="card-header">
     <h3>🎬 独立视频区 (MP4)</h3>
     <canvas id="vCanvas" class="visualizer" width="45" height="20"></canvas>
   </div>
   <input type="file" id="vFile" accept=".mp4,.mov">
-  <video id="vEl" controls playsinline></video>
+  <video id="vEl" controls playsinline preload="auto"></video>
   
   <div class="select-box">
     <label>🎬 音效风格：</label>
@@ -138,36 +136,13 @@
 </div>
 
 <script>
-// 通用音效配置函数
-function applyPreset(preset, eqLow, eqMid, eqHigh, panner, analyser, gainNode, ctx) {
-  // 重置基础增益
-  eqLow.gain.value = 0;
-  eqMid.gain.value = 0;
-  eqHigh.gain.value = 0;
-
+function applyPreset(preset, eqLow, eqMid, eqHigh) {
+  eqLow.gain.value = 0; eqMid.gain.value = 0; eqHigh.gain.value = 0;
   switch(preset) {
-    case 'bass':
-      eqLow.gain.value = 12; // 极大增强低音
-      eqMid.gain.value = -2;
-      eqHigh.gain.value = 2;
-      break;
-    case 'vocal':
-      eqLow.gain.value = -3;
-      eqMid.gain.value = 8;  // 突出人声中频
-      eqHigh.gain.value = 5;
-      break;
-    case 'live':
-      eqLow.gain.value = 4;
-      eqMid.gain.value = 3;
-      eqHigh.gain.value = 6;
-      break;
-    case 'vinyl':
-      eqLow.gain.value = 2;
-      eqMid.gain.value = -4; // 模拟黑胶温润感
-      eqHigh.gain.value = -8;
-      break;
-    default:
-      break;
+    case 'bass': eqLow.gain.value = 12; eqMid.gain.value = -2; eqHigh.gain.value = 2; break;
+    case 'vocal': eqLow.gain.value = -3; eqMid.gain.value = 8; eqHigh.gain.value = 5; break;
+    case 'live': eqLow.gain.value = 4; eqMid.gain.value = 3; eqHigh.gain.value = 6; break;
+    case 'vinyl': eqLow.gain.value = 2; eqMid.gain.value = -4; eqHigh.gain.value = -8; break;
   }
 }
 
@@ -186,16 +161,12 @@ aFile.addEventListener('change', async e => {
     aAnalyser = aCtx.createAnalyser(); aAnalyser.fftSize = 32;
     aPanner = aCtx.createPanner(); aPanner.panningModel = 'HRTF';
     aGain = aCtx.createGain(); aGain.gain.value = aVol.value / 100;
-
-    // 创建三段式均衡器模拟不同音效
     aEqLow = aCtx.createBiquadFilter(); aEqLow.type = 'lowshelf'; aEqLow.frequency.value = 250;
     aEqMid = aCtx.createBiquadFilter(); aEqMid.type = 'peaking'; aEqMid.frequency.value = 1500;
     aEqHigh = aCtx.createBiquadFilter(); aEqHigh.type = 'highshelf'; aEqHigh.frequency.value = 4000;
-
-    // 链路串联
   }
   if (aCtx.state === 'suspended') aCtx.resume();
-  aStatus.textContent = "解码中...";
+  aStatus.textContent = "音频解码中...";
   aBuf = await aCtx.decodeAudioData(await f.arrayBuffer());
   aPlay.disabled = false; aStop.disabled = false; aLoop.disabled = false;
   aStatus.textContent = "音频就绪";
@@ -211,28 +182,16 @@ aPlay.addEventListener('click', () => {
   aSrc = aCtx.createBufferSource(); 
   aSrc.buffer = aBuf;
   aSrc.loop = aLoopState;
-
-  // 重新绑定连接流
-  aSrc.connect(aEqLow);
-  aEqLow.connect(aEqMid);
-  aEqMid.connect(aEqHigh);
-  aEqHigh.connect(aPanner);
-  aPanner.connect(aAnalyser);
-  aAnalyser.connect(aGain);
-  aGain.connect(aCtx.destination);
-
+  aSrc.connect(aEqLow); aEqLow.connect(aEqMid); aEqMid.connect(aEqHigh); aEqHigh.connect(aPanner); aPanner.connect(aAnalyser); aAnalyser.connect(aGain); aGain.connect(aCtx.destination);
   applyPreset(aCurrentPreset, aEqLow, aEqMid, aEqHigh);
-
   aSrc.start(0);
   aPlayState = true; 
   aStatus.textContent = "▶ 播放中 [" + aPreset.options[aPreset.selectedIndex].text + "]";
   runAOrbit();
   drawAVisualizer();
-
   aSrc.onended = () => {
     if (!aLoopState && aPlayState) {
-      aPlayState = false;
-      cancelAnimationFrame(aAnim);
+      aPlayState = false; cancelAnimationFrame(aAnim);
       aStatus.textContent = "播放完毕";
       clearCanvas(aCanvasCtx, aCanvas);
     }
@@ -283,8 +242,7 @@ function drawAVisualizer() {
   const dataArray = new Uint8Array(aAnalyser.frequencyBinCount);
   aAnalyser.getByteFrequencyData(dataArray);
   aCanvasCtx.clearRect(0, 0, aCanvas.width, aCanvas.height);
-  const barWidth = 3;
-  let x = 2;
+  const barWidth = 3; let x = 2;
   for (let i = 0; i < 6; i++) {
     let barHeight = (dataArray[i] / 255) * aCanvas.height;
     aCanvasCtx.fillStyle = '#34d399';
@@ -293,7 +251,7 @@ function drawAVisualizer() {
   }
 }
 
-// 视频逻辑
+// 视频逻辑（防杂音平滑处理）
 let vCtx, vPanner, vGain, vAnalyser, vNode, vEqLow, vEqMid, vEqHigh, vAnim, vAngle = 0, vCurrentPreset = 'normal';
 const vFile = document.getElementById('vFile'), vEl = document.getElementById('vEl'), vLoop = document.getElementById('vLoop'), vStatus = document.getElementById('vStatus'), vVol = document.getElementById('vVol'), vVolVal = document.getElementById('vVolVal'), vSpeed = document.getElementById('vSpeed'), vSpeedVal = document.getElementById('vSpeedVal'), vCanvas = document.getElementById('vCanvas'), vPreset = document.getElementById('vPreset');
 const vCanvasCtx = vCanvas.getContext('2d');
@@ -301,9 +259,14 @@ const vCanvasCtx = vCanvas.getContext('2d');
 vFile.addEventListener('change', e => {
   const f = e.target.files[0];
   if (!f) return;
+  vStatus.textContent = "视频加载中，请稍候...";
   vEl.src = URL.createObjectURL(f);
-  vEl.load(); vLoop.disabled = false;
-  vStatus.textContent = "视频已加载";
+  vEl.load();
+});
+
+vEl.addEventListener('loadeddata', () => {
+  vLoop.disabled = false;
+  vStatus.textContent = "视频已就绪，可点击播放";
 });
 
 vPreset.addEventListener('change', e => {
@@ -322,20 +285,17 @@ vEl.addEventListener('play', () => {
     vCtx = new (window.AudioContext || window.webkitAudioContext)();
     vAnalyser = vCtx.createAnalyser(); vAnalyser.fftSize = 32;
     vPanner = vCtx.createPanner(); vPanner.panningModel = 'HRTF';
-    vGain = vCtx.createGain(); vGain.gain.value = vVol.value / 100;
+    vGain = vCtx.createGain(); 
+    // 平滑初始音量，彻底消除开始播放时的爆音
+    vGain.gain.setValueAtTime(0, vCtx.currentTime);
+    vGain.gain.linearRampToValueAtTime(vVol.value / 100, vCtx.currentTime + 0.1);
     
     vEqLow = vCtx.createBiquadFilter(); vEqLow.type = 'lowshelf'; vEqLow.frequency.value = 250;
     vEqMid = vCtx.createBiquadFilter(); vEqMid.type = 'peaking'; vEqMid.frequency.value = 1500;
     vEqHigh = vCtx.createBiquadFilter(); vEqHigh.type = 'highshelf'; vEqHigh.frequency.value = 4000;
 
     vNode = vCtx.createMediaElementSource(vEl);
-    vNode.connect(vEqLow);
-    vEqLow.connect(vEqMid);
-    vEqMid.connect(vEqHigh);
-    vEqHigh.connect(vPanner);
-    vPanner.connect(vAnalyser);
-    vAnalyser.connect(vGain);
-    vGain.connect(vCtx.destination);
+    vNode.connect(vEqLow); vEqLow.connect(vEqMid); vEqMid.connect(vEqHigh); vEqHigh.connect(vPanner); vPanner.connect(vAnalyser); vAnalyser.connect(vGain); vGain.connect(vCtx.destination);
   }
   if (vCtx.state === 'suspended') vCtx.resume();
   applyPreset(vCurrentPreset, vEqLow, vEqMid, vEqHigh);
@@ -352,12 +312,15 @@ vEl.addEventListener('pause', () => {
 
 vEl.addEventListener('ended', () => {
   clearCanvas(vCanvasCtx, vCanvas);
+  vStatus.textContent = "视频播放完毕";
 });
 
 vVol.addEventListener('input', e => {
   const val = e.target.value;
   vVolVal.textContent = val + '%';
-  if (vGain) vGain.gain.value = val / 100;
+  if (vGain) {
+    vGain.gain.setValueAtTime(val / 100, vCtx.currentTime);
+  }
 });
 
 vSpeed.addEventListener('input', e => {
@@ -383,8 +346,7 @@ function drawVVisualizer() {
   const dataArray = new Uint8Array(vAnalyser.frequencyBinCount);
   vAnalyser.getByteFrequencyData(dataArray);
   vCanvasCtx.clearRect(0, 0, vCanvas.width, vCanvas.height);
-  const barWidth = 3;
-  let x = 2;
+  const barWidth = 3; let x = 2;
   for (let i = 0; i < 6; i++) {
     let barHeight = (dataArray[i] / 255) * vCanvas.height;
     vCanvasCtx.fillStyle = '#34d399';
