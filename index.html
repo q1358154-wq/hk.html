@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>双模播放器 - 完美联动终极版</title>
+  <title>双模播放器 - 音效专属音量/强度完美调节版</title>
   <style>
     body { background: #0b0f0e; color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 12px; display: flex; flex-direction: column; gap: 14px; box-sizing: border-box; min-height: 100vh; overflow-y: auto; }
     
@@ -28,7 +28,6 @@
     video { width: 100%; max-height: 25vh; border-radius: 8px; margin-bottom: 8px; background: #000; border: 1px solid rgba(52, 211, 153, 0.1); object-fit: contain; }
     .tip { font-size: 11px; color: #34d399; margin-top: 6px; opacity: 0.9; }
     
-    /* 现代化便捷控制面板：改用清晰的横向滑块，保证 100% 灵敏好用 */
     .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 8px; border: 1px solid rgba(52, 211, 153, 0.08); }
     .control-item { display: flex; flex-direction: column; gap: 3px; }
     .control-item label { font-size: 10px; color: #6ee7b7; display: flex; justify-content: space-between; }
@@ -71,11 +70,11 @@
 
   <div class="controls-grid">
     <div class="control-item">
-      <label>音频速度 <span id="aSpeedVal">1.0x</span></label>
-      <input type="range" id="aSpeed" min="5" max="20" value="10">
+      <label>音效音量/强度 <span id="aFxVolVal">100%</span></label>
+      <input type="range" id="aFxVol" min="0" max="200" value="100">
     </div>
     <div class="control-item">
-      <label>音量大小 <span id="aVolVal">80%</span></label>
+      <label>总音量大小 <span id="aVolVal">80%</span></label>
       <input type="range" id="aVol" min="0" max="100" value="80">
     </div>
   </div>
@@ -84,7 +83,7 @@
 
 <div class="card">
   <div class="card-header">
-    <h3>🎬 独立视频区 (MP4 + 实时全音效引擎)</h3>
+    <h3>🎬 独立视频区 (MP4 + 音效专属音量联动)</h3>
     <canvas id="vCanvas" class="visualizer" width="45" height="20"></canvas>
   </div>
   <input type="file" id="vFile" accept=".mp4,.mov">
@@ -106,11 +105,11 @@
 
   <div class="controls-grid">
     <div class="control-item">
-      <label>视频速度 <span id="vSpeedVal">1.0x</span></label>
-      <input type="range" id="vSpeed" min="5" max="20" value="10">
+      <label>音效音量/强度 <span id="vFxVolVal">100%</span></label>
+      <input type="range" id="vFxVol" min="0" max="200" value="100">
     </div>
     <div class="control-item">
-      <label>音量大小 <span id="vVolVal">100%</span></label>
+      <label>总音量大小 <span id="vVolVal">100%</span></label>
       <input type="range" id="vVol" min="0" max="100" value="100">
     </div>
   </div>
@@ -118,13 +117,15 @@
 </div>
 
 <script>
-function applyPreset(preset, eqLow, eqMid, eqHigh) {
+// 基础音效预设（结合音效专属音量强度调节）
+function applyPreset(preset, eqLow, eqMid, eqHigh, intensity) {
   eqLow.gain.value = 0; eqMid.gain.value = 0; eqHigh.gain.value = 0;
+  const mul = intensity / 100; // 根据“音效音量/强度”滑块实时缩放音效力度
   switch(preset) {
-    case 'bass': eqLow.gain.value = 12; eqMid.gain.value = -2; eqHigh.gain.value = 2; break;
-    case 'vocal': eqLow.gain.value = -3; eqMid.gain.value = 8; eqHigh.gain.value = 5; break;
-    case 'live': eqLow.gain.value = 4; eqMid.gain.value = 3; eqHigh.gain.value = 6; break;
-    case 'vinyl': eqLow.gain.value = 2; eqMid.gain.value = -4; eqHigh.gain.value = -8; break;
+    case 'bass': eqLow.gain.value = 12 * mul; eqMid.gain.value = -2 * mul; eqHigh.gain.value = 2 * mul; break;
+    case 'vocal': eqLow.gain.value = -3 * mul; eqMid.gain.value = 8 * mul; eqHigh.gain.value = 5 * mul; break;
+    case 'live': eqLow.gain.value = 4 * mul; eqMid.gain.value = 3 * mul; eqHigh.gain.value = 6 * mul; break;
+    case 'vinyl': eqLow.gain.value = 2 * mul; eqMid.gain.value = -4 * mul; eqHigh.gain.value = -8 * mul; break;
   }
 }
 
@@ -132,7 +133,7 @@ function applyPreset(preset, eqLow, eqMid, eqHigh) {
 let aCtx, aPanner, aGain, aAnalyser, aBuf, aSrc, aPlayState = false, aLoopState = false;
 let aEqLow, aEqMid, aEqHigh, aAnim, aAngle = 0, aCurrentPreset = 'normal';
 
-const aFile = document.getElementById('aFile'), aPlay = document.getElementById('aPlay'), aStop = document.getElementById('aStop'), aLoop = document.getElementById('aLoop'), aStatus = document.getElementById('aStatus'), aVol = document.getElementById('aVol'), aVolVal = document.getElementById('aVolVal'), aSpeed = document.getElementById('aSpeed'), aSpeedVal = document.getElementById('aSpeedVal'), aCanvas = document.getElementById('aCanvas'), aPreset = document.getElementById('aPreset');
+const aFile = document.getElementById('aFile'), aPlay = document.getElementById('aPlay'), aStop = document.getElementById('aStop'), aLoop = document.getElementById('aLoop'), aStatus = document.getElementById('aStatus'), aVol = document.getElementById('aVol'), aVolVal = document.getElementById('aVolVal'), aFxVol = document.getElementById('aFxVol'), aFxVolVal = document.getElementById('aFxVolVal'), aCanvas = document.getElementById('aCanvas'), aPreset = document.getElementById('aPreset');
 const aCanvasCtx = aCanvas.getContext('2d');
 
 aFile.addEventListener('change', async e => {
@@ -156,7 +157,13 @@ aFile.addEventListener('change', async e => {
 
 aPreset.addEventListener('change', e => {
   aCurrentPreset = e.target.value;
-  if (aEqLow) applyPreset(aCurrentPreset, aEqLow, aEqMid, aEqHigh);
+  if (aEqLow) applyPreset(aCurrentPreset, aEqLow, aEqMid, aEqHigh, aFxVol.value);
+});
+
+aFxVol.addEventListener('input', e => {
+  const val = e.target.value;
+  aFxVolVal.textContent = val + '%';
+  if (aEqLow) applyPreset(aCurrentPreset, aEqLow, aEqMid, aEqHigh, val);
 });
 
 aPlay.addEventListener('click', () => {
@@ -165,7 +172,7 @@ aPlay.addEventListener('click', () => {
   aSrc.buffer = aBuf;
   aSrc.loop = aLoopState;
   aSrc.connect(aEqLow); aEqLow.connect(aEqMid); aEqMid.connect(aEqHigh); aEqHigh.connect(aPanner); aPanner.connect(aAnalyser); aAnalyser.connect(aGain); aGain.connect(aCtx.destination);
-  applyPreset(aCurrentPreset, aEqLow, aEqMid, aEqHigh);
+  applyPreset(aCurrentPreset, aEqLow, aEqMid, aEqHigh, aFxVol.value);
   aSrc.start(0);
   aPlayState = true; 
   aStatus.textContent = "▶ 播放中 [" + aPreset.options[aPreset.selectedIndex].text + "]";
@@ -201,21 +208,15 @@ aVol.addEventListener('input', e => {
   if (aGain) aGain.gain.value = val / 100;
 });
 
-aSpeed.addEventListener('input', e => {
-  const val = e.target.value;
-  const speedRate = val * 0.1;
-  aSpeedVal.textContent = speedRate.toFixed(1) + 'x';
-  if (aSrc) {
-    // 动态调整 Web Audio 播放速度
-    aSrc.playbackRate.value = speedRate;
-  }
-});
-
 function runAOrbit() {
   if (!aPlayState) return;
   if (aCurrentPreset === 'space') {
-    aAngle += 0.03 * (aSpeed.value / 10);
-    if (aPanner) { aPanner.positionX.value = Math.cos(aAngle) * 2; aPanner.positionZ.value = Math.sin(aAngle) * 2; }
+    const intensityMul = aFxVol.value / 100;
+    aAngle += 0.04;
+    if (aPanner) { 
+      aPanner.positionX.value = Math.cos(aAngle) * 2 * intensityMul; 
+      aPanner.positionZ.value = Math.sin(aAngle) * 2 * intensityMul; 
+    }
   } else {
     if (aPanner) { aPanner.positionX.value = 0; aPanner.positionZ.value = 1; }
   }
@@ -237,9 +238,9 @@ function drawAVisualizer() {
   }
 }
 
-// 视频逻辑（音速、音效速度、音量完美联动）
+// 视频逻辑
 let vCtx, vPanner, vGain, vAnalyser, vSourceNode, vEqLow, vEqMid, vEqHigh, vAnim, vAngle = 0, vCurrentPreset = 'normal';
-const vFile = document.getElementById('vFile'), vEl = document.getElementById('vEl'), vLoop = document.getElementById('vLoop'), vStatus = document.getElementById('vStatus'), vVol = document.getElementById('vVol'), vVolVal = document.getElementById('vVolVal'), vSpeed = document.getElementById('vSpeed'), vSpeedVal = document.getElementById('vSpeedVal'), vCanvas = document.getElementById('vCanvas'), vPreset = document.getElementById('vPreset');
+const vFile = document.getElementById('vFile'), vEl = document.getElementById('vEl'), vLoop = document.getElementById('vLoop'), vStatus = document.getElementById('vStatus'), vVol = document.getElementById('vVol'), vVolVal = document.getElementById('vVolVal'), vFxVol = document.getElementById('vFxVol'), vFxVolVal = document.getElementById('vFxVolVal'), vCanvas = document.getElementById('vCanvas'), vPreset = document.getElementById('vPreset');
 const vCanvasCtx = vCanvas.getContext('2d');
 
 vFile.addEventListener('change', e => {
@@ -253,7 +254,13 @@ vFile.addEventListener('change', e => {
 
 vPreset.addEventListener('change', e => {
   vCurrentPreset = e.target.value;
-  if (vEqLow) applyPreset(vCurrentPreset, vEqLow, vEqMid, vEqHigh);
+  if (vEqLow) applyPreset(vCurrentPreset, vEqLow, vEqMid, vEqHigh, vFxVol.value);
+});
+
+vFxVol.addEventListener('input', e => {
+  const val = e.target.value;
+  vFxVolVal.textContent = val + '%';
+  if (vEqLow) applyPreset(vCurrentPreset, vEqLow, vEqMid, vEqHigh, val);
 });
 
 vLoop.addEventListener('click', () => {
@@ -267,7 +274,8 @@ vEl.addEventListener('play', () => {
     vCtx = new (window.AudioContext || window.webkitAudioContext)();
     vAnalyser = vCtx.createAnalyser(); vAnalyser.fftSize = 32;
     vPanner = vCtx.createPanner(); vPanner.panningModel = 'HRTF';
-    vGain = vCtx.createGain(); vGain.gain.value = vVol.value / 100;
+    vGain = vCtx.createGain(); 
+    vGain.gain.value = vVol.value / 100;
     
     vEqLow = vCtx.createBiquadFilter(); vEqLow.type = 'lowshelf'; vEqLow.frequency.value = 250;
     vEqMid = vCtx.createBiquadFilter(); vEqMid.type = 'peaking'; vEqMid.frequency.value = 1500;
@@ -283,7 +291,7 @@ vEl.addEventListener('play', () => {
     vGain.connect(vCtx.destination);
   }
   if (vCtx.state === 'suspended') vCtx.resume();
-  applyPreset(vCurrentPreset, vEqLow, vEqMid, vEqHigh);
+  applyPreset(vCurrentPreset, vEqLow, vEqMid, vEqHigh, vFxVol.value);
   runVOrbit();
   drawVVisualizer();
   vStatus.textContent = "🎬 视频播放中 [" + vPreset.options[vPreset.selectedIndex].text + "]";
@@ -301,27 +309,22 @@ vEl.addEventListener('ended', () => {
   vCanvasCtx.clearRect(0, 0, vCanvas.width, vCanvas.height);
 });
 
-// 音量滑块：完美控制 gain 节点，响应极快
+// 总音量滑块
 vVol.addEventListener('input', e => {
   const val = e.target.value;
   vVolVal.textContent = val + '%';
   if (vGain) vGain.gain.value = val / 100;
 });
 
-// 速度滑块：视频画面播放速度 + 8D环绕音效速度 同步联动！
-vSpeed.addEventListener('input', e => {
-  const val = e.target.value;
-  const speedRate = val * 0.1;
-  vSpeedVal.textContent = speedRate.toFixed(1) + 'x';
-  vEl.playbackRate = speedRate;
-});
-
 function runVOrbit() {
   if (vEl.paused || vEl.ended) return;
   if (vCurrentPreset === 'space') {
-    // 关键修复：把 8D 环绕旋转速度与当前视频速度滑块直接挂钩
-    vAngle += 0.03 * (vSpeed.value / 10);
-    if (vPanner) { vPanner.positionX.value = Math.cos(vAngle) * 2; vPanner.positionZ.value = Math.sin(vAngle) * 2; }
+    const intensityMul = vFxVol.value / 100;
+    vAngle += 0.04;
+    if (vPanner) { 
+      vPanner.positionX.value = Math.cos(vAngle) * 2 * intensityMul; 
+      vPanner.positionZ.value = Math.sin(vAngle) * 2 * intensityMul; 
+    }
   } else {
     if (vPanner) { vPanner.positionX.value = 0; vPanner.positionZ.value = 1; }
   }
