@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>极客音视频解析与 100种音效/8D空间引擎</title>
+  <title>极客音视频解析与 100种音效/8D空间引擎（支持录制下载）</title>
   <style>
     *, *::before, *::after {
       box-sizing: border-box;
@@ -277,16 +277,19 @@
   <button id="aPlay" disabled>▶ 播放环绕音频</button>
   <button id="aStop" class="off" disabled>⏹ 停止播放</button>
   <button id="aLoop" class="off" disabled>🔁 循环: 关</button>
+  
+  <!-- 新增的一键录制并下载带音效音频按钮 -->
+  <button id="aRecordDownloadBtn" class="off" disabled style="background: #2563eb; margin-top: 6px;">📥 录制并下载带音效音频</button>
 
   <div class="dual-slider-grid">
-    <div class="slider-box" style="margin-top:0;">
+    <div class="slider-box">
       <div class="slider-header">
         <span>运镜速度</span>
         <span id="speedVal">1.0x</span>
       </div>
       <input type="range" id="speedRange" class="horizontal" min="0.2" max="3" step="0.2" value="1">
     </div>
-    <div class="slider-box" style="margin-top:0;">
+    <div class="slider-box">
       <div class="slider-header">
         <span>音效强度</span>
         <span id="aFxIntVal">100%</span>
@@ -375,8 +378,10 @@ function applyPresetEffect(fx, f1, f2, intensity = 1.0) {
   }
 }
 
-let aCtx, aPanner, aEq1, aEq2, aGain, aAnalyser, aBuf, aSrc;
+let aCtx, aPanner, aEq1, aEq2, aGain, aAnalyser, destNode, aBuf, aSrc;
 let aPlayState = false, aLoopState = false, animId = null, angle = 0;
+let mediaRecorder = null;
+let recordedChunks = [];
 
 const cobaltUrlInput = document.getElementById('cobaltUrlInput');
 const parseVideoBtn = document.getElementById('parseVideoBtn');
@@ -386,6 +391,7 @@ const aStatus = document.getElementById('aStatus');
 const aPlay = document.getElementById('aPlay');
 const aStop = document.getElementById('aStop');
 const aLoop = document.getElementById('aLoop');
+const aRecordDownloadBtn = document.getElementById('aRecordDownloadBtn');
 const aVol = document.getElementById('aVol');
 const aVolVal = document.getElementById('aVolVal');
 const speedRange = document.getElementById('speedRange');
@@ -409,7 +415,6 @@ function initAudioContext() {
   }
   aCtx = new (window.AudioContext || window.webkitAudioContext)();
   
-  // 创建并牢固建立管线通路
   aPanner = aCtx.createPanner();
   aPanner.panningModel = 'HRTF';
   
@@ -421,14 +426,18 @@ function initAudioContext() {
   
   aGain = aCtx.createGain();
   aGain.gain.value = aVol.value / 100;
+
+  // 创建录音导出专用目标节点
+  destNode = aCtx.createMediaStreamDestination();
   
-  // 严格串联路由：Source -> Panner -> Eq1 -> Eq2 -> Analyser -> Gain -> Destination
-  // 注意 Source 在每次播放时动态 connect 到 aPanner
+  // 严格串联路由：Source -> Panner -> Eq1 -> Eq2 -> Analyser -> Gain -> [Destination & RecordDest]
   aPanner.connect(aEq1);
   aEq1.connect(aEq2);
   aEq2.connect(aAnalyser);
   aAnalyser.connect(aGain);
-  aGain.connect(aCtx.destination);
+  
+  aGain.connect(aCtx.destination); // 正常播放输出
+  aGain.connect(destNode);         // 录制分流输出
 }
 
 pasteBtn.addEventListener('click', async () => {
@@ -482,7 +491,9 @@ async function handleLinkProcessing(mode) {
       aPlay.disabled = false;
       aStop.disabled = false;
       aLoop.disabled = false;
-      aStatus.textContent = "✅ 音频提取成功！已载入 8D 引擎";
+      aRecordDownloadBtn.disabled = false;
+      aRecordDownloadBtn.classList.remove('off');
+      aStatus.textContent = "✅ 音频提取成功！已载入 8D 引擎与下载通道";
       aPlay.click();
     } else {
       const vEl = document.getElementById('vElement');
@@ -515,7 +526,9 @@ async function processAudioFile(file) {
     aPlay.disabled = false;
     aStop.disabled = false;
     aLoop.disabled = false;
-    aStatus.textContent = `✅ ${file.name} 加载完毕！点击播放按钮收听`;
+    aRecordDownloadBtn.disabled = false;
+    aRecordDownloadBtn.classList.remove('off');
+    aStatus.textContent = `✅ ${file.name} 加载完毕！点击播放或直接下载带特效音频`;
   } catch(err) {
     aStatus.textContent = "❌ 该文件无法解码，请确认是否为有效音频文件";
   }
@@ -564,18 +577,14 @@ aPlay.addEventListener('click', async () => {
     await aCtx.resume();
   }
 
-  // 停掉旧的播放源
   if (aSrc) { 
     try { aSrc.stop(); aSrc.disconnect(); } catch(e){} 
     aSrc = null; 
   }
 
-  // 每次播放必须重新创建 BufferSource
   aSrc = aCtx.createBufferSource();
   aSrc.buffer = aBuf;
   aSrc.loop = aLoopState;
-  
-  // 严格连接到 8D Panner 节点
   aSrc.connect(aPanner);
   
   aSrc.start(0);
@@ -589,10 +598,15 @@ aPlay.addEventListener('click', async () => {
 
 aStop.addEventListener('click', () => {
   if (aSrc) { try { aSrc.stop(); aSrc.disconnect(); } catch(e){} aSrc = null; }
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+  }
   aPlayState = false;
   if (animId) cancelAnimationFrame(animId);
   aPlay.classList.add('off');
   aStop.classList.remove('off');
+  aRecordDownloadBtn.disabled = false;
+  aRecordDownloadBtn.textContent = "📥 录制并下载带音效音频";
   aStatus.textContent = "⏹ 播放已停止";
   clearCanvases();
 });
@@ -602,6 +616,81 @@ aLoop.addEventListener('click', () => {
   aLoop.textContent = aLoopState ? "🔁 循环: 开" : "🔁 循环: 关";
   aLoop.className = aLoopState ? "" : "off";
   if (aSrc) aSrc.loop = aLoopState;
+});
+
+// 核心：一键录制并下载混音音效文件
+aRecordDownloadBtn.addEventListener('click', async () => {
+  if (!aBuf) {
+    aStatus.textContent = "⚠️ 请先加载音频文件！";
+    return;
+  }
+  
+  initAudioContext();
+  if (aCtx.state === 'suspended') { await aCtx.resume(); }
+
+  if (aSrc) { try { aSrc.stop(); aSrc.disconnect(); } catch(e){} aSrc = null; }
+
+  recordedChunks = [];
+  const options = { mimeType: 'audio/webm;codecs=opus' };
+  if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+    options.mimeType = 'audio/webm';
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+      options.mimeType = ''; 
+    }
+  }
+
+  try {
+    mediaRecorder = new MediaRecorder(destNode.stream, options);
+  } catch (e) {
+    aStatus.textContent = "❌ 当前浏览器环境不支持音频录制";
+    return;
+  }
+
+  mediaRecorder.ondataavailable = (event) => {
+    if (event.data && event.data.size > 0) {
+      recordedChunks.push(event.data);
+    }
+  };
+
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    const fxName = aFxSelect.options[aFxSelect.selectedIndex].text.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, "");
+    a.download = `Processed_Audio_${fxName}.webm`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }, 100);
+    aStatus.textContent = "✅ 带音效的成品音频文件已下载成功！";
+    aRecordDownloadBtn.textContent = "📥 录制并下载带音效音频";
+    aRecordDownloadBtn.disabled = false;
+  };
+
+  mediaRecorder.start();
+  aRecordDownloadBtn.textContent = "🔴 录制音效中(播放完自动保存)...";
+  aRecordDownloadBtn.disabled = true;
+
+  aSrc = aCtx.createBufferSource();
+  aSrc.buffer = aBuf;
+  aSrc.loop = false; // 录制时播放完整一次
+  aSrc.connect(aPanner);
+  
+  aSrc.onended = () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+    }
+    aPlayState = false;
+  };
+
+  aSrc.start(0);
+  aPlayState = true;
+  aStatus.textContent = "🔴 正在实时渲染音效并后台录制中...";
+  drawVisualizerAndRadar();
 });
 
 aVol.addEventListener('input', e => {
