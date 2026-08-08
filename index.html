@@ -52,9 +52,7 @@
     .video-preview-container { position: relative; width: 100%; height: 140px; background: rgba(0,0,0,0.7); border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(16, 185, 129, 0.25); overflow: hidden; margin-bottom: 8px; }
     video { width: 100%; height: 100%; object-fit: contain; background: #000; border-radius: 12px; }
 
-    input[type="text"], select, textarea {
-      font-size: 16px; 
-    }
+    input[type="text"], select, textarea { font-size: 16px; }
 
     .select-box select {
       font-size: 16px;
@@ -64,21 +62,30 @@
 
     .tip, h3, .slider-header { font-size: 12px; }
 
-    input[type="file"] { 
-      width: 100%; 
-      margin: 4px 0; 
-      color: #a7f3d0; 
-      font-size: 14px; 
+    /* 优化后的拖拽/点击上传自定义按钮区 */
+    .drop-zone {
+      border: 2px dashed rgba(52, 211, 153, 0.4);
+      background: rgba(16, 185, 129, 0.05);
+      padding: 12px;
+      text-align: center;
+      border-radius: 10px;
+      cursor: pointer;
+      margin: 6px 0;
+      transition: all 0.2s;
     }
-
-    input[type="file"]::file-selector-button { 
-      background: #047857; 
-      color: #a7f3d0; 
-      border: none; 
-      padding: 8px 12px; 
-      border-radius: 6px; 
-      cursor: pointer; 
-      font-weight: 500; 
+    .drop-zone:hover {
+      border-color: #34d399;
+      background: rgba(16, 185, 129, 0.1);
+    }
+    .drop-zone input[type="file"] {
+      display: none;
+    }
+    .drop-zone label {
+      color: #6ee7b7;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: block;
     }
 
     button { 
@@ -95,7 +102,6 @@
     }
     button:hover { opacity: 0.9; transform: translateY(-1px); }
     button.off { background: #0c261b; color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.15); }
-    button.export-btn { background: #047857; border: 1px solid #34d399; font-weight: 600; }
     button:disabled { opacity: 0.25; transform: none; cursor: not-allowed; }
 
     .select-box { background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 7px 10px; margin-top: 6px; display: flex; align-items: center; justify-content: space-between; }
@@ -146,10 +152,13 @@
     </div>
   </div>
 
-  <div style="text-align: center; font-size: 10px; color: #a7f3d0; opacity: 0.5; margin: 4px 0;">— 或选择任意本地音频文件 (支持 MP3/FLAC/WAV/M4A/OGG等) —</div>
+  <div style="text-align: center; font-size: 10px; color: #a7f3d0; opacity: 0.5; margin: 4px 0;">— 或点击/拖拽任意本地音频文件 (支持所有格式) —</div>
 
-  <!-- 更改 accept 为 audio/* 以支持所有音频格式 -->
-  <input type="file" id="aFile" accept="audio/*">
+  <!-- 万能拖拽与点击上传区域 -->
+  <div class="drop-zone" id="dropZone">
+    <label for="aFile">📁 点击选择 或 拖拽任何音频文件到此处</label>
+    <input type="file" id="aFile" accept="*/*">
+  </div>
   
   <div class="select-box">
     <label>🎵 100音效选择：</label>
@@ -296,7 +305,7 @@
     <input type="range" id="aVol" class="horizontal" min="0" max="100" value="80">
   </div>
 
-  <div class="tip" id="aStatus">等待选择或解析音频链接...</div>
+  <div class="tip" id="aStatus">等待选择或拖拽任意音频文件...</div>
 </div>
 
 <div class="card">
@@ -308,7 +317,10 @@
     <video id="vElement" playsinline controls></video>
   </div>
 
-  <input type="file" id="vFile" accept="video/*">
+  <div class="drop-zone" id="vDropZone">
+    <label for="vFile">📁 点击选择 或 拖拽视频文件到此处</label>
+    <input type="file" id="vFile" accept="video/*">
+  </div>
 
   <button id="vPlay" disabled>▶ 播放视频</button>
   <button id="vStop" class="off" disabled>⏹ 停止播放</button>
@@ -440,7 +452,6 @@ async function handleLinkProcessing(mode) {
     }
 
     const isDirectMedia = rawUrl.match(/\.(mp3|wav|ogg|m4a|flac|aac|wma|webm)($|\?)/i) || rawUrl.includes('raw.githubusercontent.com');
-
     let resolvedUrl = rawUrl;
 
     if (!isDirectMedia) {
@@ -450,12 +461,7 @@ async function handleLinkProcessing(mode) {
         if (!testRes.ok) throw new Error("CORS Blocked");
         resolvedUrl = proxyApi;
       } catch (err) {
-        if (rawUrl.includes('instagram.com')) {
-          const ddUrl = rawUrl.replace('instagram.com', 'ddinstagram.com');
-          window.open(ddUrl, '_blank');
-          throw new Error("IG 防火墙已拦截 API！已在新标签打开镜像页面，请长按保存视频后从【选取文件】导入");
-        }
-        throw new Error("该网页禁止前端跨域读取，请先下载媒体文件后通过【选取文件】处理");
+        throw new Error("该网页禁止前端跨域读取，请直接把媒体文件拖入下方方框内");
       }
     }
 
@@ -489,13 +495,12 @@ async function handleLinkProcessing(mode) {
 parseVideoBtn.addEventListener('click', () => handleLinkProcessing('video'));
 parseAudioBtn.addEventListener('click', () => handleLinkProcessing('audio'));
 
-// 通用音频文件解析器：支持任意格式音频
-document.getElementById('aFile').addEventListener('change', async e => {
-  const file = e.target.files[0];
+// 万能音频解码核心
+async function processAudioFile(file) {
   if (!file) return;
   initAudioContext();
   if (aCtx.state === 'suspended') aCtx.resume();
-  aStatus.textContent = `正在解码 ${file.name} (支持任意格式)...`;
+  aStatus.textContent = `正在全格式万能解码 ${file.name}...`;
   try {
     const arrayBuffer = await file.arrayBuffer();
     aBuf = await aCtx.decodeAudioData(arrayBuffer);
@@ -504,7 +509,29 @@ document.getElementById('aFile').addEventListener('change', async e => {
     aLoop.disabled = false;
     aStatus.textContent = `✅ ${file.name} 加载完毕！`;
   } catch(err) {
-    aStatus.textContent = "❌ 该音频格式暂不支持或文件损坏";
+    aStatus.textContent = "❌ 该文件无法解码，请确认是否为有效音频文件";
+  }
+}
+
+// 绑定文件选择
+const aFile = document.getElementById('aFile');
+aFile.addEventListener('change', e => {
+  processAudioFile(e.target.files[0]);
+});
+
+// 绑定拖拽上传
+const dropZone = document.getElementById('dropZone');
+['dragenter', 'dragover'].forEach(eventName => {
+  dropZone.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); dropZone.style.borderColor = '#fff'; }, false);
+});
+['dragleave', 'drop'].forEach(eventName => {
+  dropZone.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); dropZone.style.borderColor = 'rgba(52, 211, 153, 0.4)'; }, false);
+});
+dropZone.addEventListener('drop', e => {
+  const dt = e.dataTransfer;
+  const files = dt.files;
+  if (files && files.length > 0) {
+    processAudioFile(files[0]);
   }
 });
 
@@ -633,15 +660,35 @@ function drawVisualizerAndRadar() {
 
 clearCanvases();
 
+// 视频本地处理逻辑
 const vFile = document.getElementById('vFile');
 const vElement = document.getElementById('vElement');
-vFile.addEventListener('change', e => {
-  const file = e.target.files[0];
+const vDropZone = document.getElementById('vDropZone');
+
+function processVideoFile(file) {
   if (!file) return;
   vElement.src = URL.createObjectURL(file);
   document.getElementById('vPlay').disabled = false;
   document.getElementById('vStop').disabled = false;
   document.getElementById('vStatus').textContent = "✅ 本地视频已被成功载入";
+}
+
+vFile.addEventListener('change', e => {
+  processVideoFile(e.target.files[0]);
+});
+
+['dragenter', 'dragover'].forEach(eventName => {
+  vDropZone.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); vDropZone.style.borderColor = '#fff'; }, false);
+});
+['dragleave', 'drop'].forEach(eventName => {
+  vDropZone.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); vDropZone.style.borderColor = 'rgba(52, 211, 153, 0.4)'; }, false);
+});
+vDropZone.addEventListener('drop', e => {
+  const dt = e.dataTransfer;
+  const files = dt.files;
+  if (files && files.length > 0) {
+    processVideoFile(files[0]);
+  }
 });
 
 document.getElementById('vPlay').addEventListener('click', () => {
