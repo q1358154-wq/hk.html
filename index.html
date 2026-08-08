@@ -62,7 +62,6 @@
 
     .tip, h3, .slider-header { font-size: 12px; }
 
-    /* 优化后的拖拽/点击上传自定义按钮区 */
     .drop-zone {
       border: 2px dashed rgba(52, 211, 153, 0.4);
       background: rgba(16, 185, 129, 0.05);
@@ -137,11 +136,11 @@
 
   <div class="slider-box" style="margin-bottom: 8px; border: 1px solid rgba(52, 211, 153, 0.5);">
     <div class="slider-header" style="margin-bottom: 4px;">
-      <span>⚡ 媒体链接 / 音频直链 / 社交链接解析：</span>
+      <span>⚡ 媒体链接 / 音频直链解析：</span>
     </div>
     
     <div style="display: flex; gap: 6px; margin-bottom: 6px;">
-      <input type="text" id="cobaltUrlInput" placeholder="粘贴视频/音频/Instagram/直链接口..." 
+      <input type="text" id="cobaltUrlInput" placeholder="粘贴视频/音频/直链接口..." 
              style="flex: 1; background: #03130a; color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); padding: 7px 8px; border-radius: 8px; outline: none;">
     </div>
 
@@ -154,7 +153,6 @@
 
   <div style="text-align: center; font-size: 10px; color: #a7f3d0; opacity: 0.5; margin: 4px 0;">— 或点击/拖拽任意本地音频文件 (支持所有格式) —</div>
 
-  <!-- 万能拖拽与点击上传区域 -->
   <div class="drop-zone" id="dropZone">
     <label for="aFile">📁 点击选择 或 拖拽任何音频文件到此处</label>
     <input type="file" id="aFile" accept="*/*">
@@ -403,18 +401,29 @@ const radarCanvas = document.getElementById('radarCanvas');
 const radarCtx = radarCanvas.getContext('2d');
 
 function initAudioContext() {
-  if (aCtx) return;
+  if (aCtx) {
+    if (aCtx.state === 'suspended') {
+      aCtx.resume();
+    }
+    return;
+  }
   aCtx = new (window.AudioContext || window.webkitAudioContext)();
   
+  // 创建并牢固建立管线通路
   aPanner = aCtx.createPanner();
   aPanner.panningModel = 'HRTF';
+  
   aEq1 = aCtx.createBiquadFilter();
   aEq2 = aCtx.createBiquadFilter();
+  
   aAnalyser = aCtx.createAnalyser();
   aAnalyser.fftSize = 32;
+  
   aGain = aCtx.createGain();
   aGain.gain.value = aVol.value / 100;
   
+  // 严格串联路由：Source -> Panner -> Eq1 -> Eq2 -> Analyser -> Gain -> Destination
+  // 注意 Source 在每次播放时动态 connect 到 aPanner
   aPanner.connect(aEq1);
   aEq1.connect(aEq2);
   aEq2.connect(aAnalyser);
@@ -445,7 +454,6 @@ async function handleLinkProcessing(mode) {
 
   try {
     initAudioContext();
-    if (aCtx.state === 'suspended') await aCtx.resume();
 
     if (rawUrl.includes('github.com') && rawUrl.includes('/blob/')) {
       rawUrl = rawUrl.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
@@ -499,15 +507,15 @@ parseAudioBtn.addEventListener('click', () => handleLinkProcessing('audio'));
 async function processAudioFile(file) {
   if (!file) return;
   initAudioContext();
-  if (aCtx.state === 'suspended') aCtx.resume();
-  aStatus.textContent = `正在全格式万能解码 ${file.name}...`;
+  aStatus.textContent = `正在万能解码 ${file.name}...`;
   try {
     const arrayBuffer = await file.arrayBuffer();
     aBuf = await aCtx.decodeAudioData(arrayBuffer);
+    
     aPlay.disabled = false;
     aStop.disabled = false;
     aLoop.disabled = false;
-    aStatus.textContent = `✅ ${file.name} 加载完毕！`;
+    aStatus.textContent = `✅ ${file.name} 加载完毕！点击播放按钮收听`;
   } catch(err) {
     aStatus.textContent = "❌ 该文件无法解码，请确认是否为有效音频文件";
   }
@@ -545,16 +553,31 @@ aFxInt.addEventListener('input', e => {
   if (aCtx && aEq1) applyPresetEffect(aFxSelect.value, aEq1, aEq2, e.target.value / 100);
 });
 
-aPlay.addEventListener('click', () => {
-  if (aSrc) { try { aSrc.stop(); aSrc.disconnect(); } catch(e){} aSrc = null; }
+aPlay.addEventListener('click', async () => {
+  if (!aBuf) {
+    aStatus.textContent = "⚠️ 请先选择或上传音频文件！";
+    return;
+  }
+  
   initAudioContext();
-  if (aCtx.state === 'suspended') aCtx.resume();
+  if (aCtx.state === 'suspended') {
+    await aCtx.resume();
+  }
 
+  // 停掉旧的播放源
+  if (aSrc) { 
+    try { aSrc.stop(); aSrc.disconnect(); } catch(e){} 
+    aSrc = null; 
+  }
+
+  // 每次播放必须重新创建 BufferSource
   aSrc = aCtx.createBufferSource();
   aSrc.buffer = aBuf;
   aSrc.loop = aLoopState;
   
+  // 严格连接到 8D Panner 节点
   aSrc.connect(aPanner);
+  
   aSrc.start(0);
   aPlayState = true;
   
