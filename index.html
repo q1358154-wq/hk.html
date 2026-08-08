@@ -5,15 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>极客音视频解析与 100种音效/8D空间引擎</title>
   <style>
-    /* ==========================================
-       P0 & P3: 全局通用重置与移动端基础规范
-       ========================================== */
     *, *::before, *::after {
       box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent; /* 消除移动端点击高亮闪烁 */
+      -webkit-tap-highlight-color: transparent;
     }
 
-    /* 消除移动端点击 300ms 延迟，提升触控响应 */
     button, a, input, select {
       touch-action: manipulation;
     }
@@ -22,18 +18,13 @@
       background: #030d08; 
       color: #ecfdf5; 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-      
-      /* 使用 dvh 解决移动端地址栏造成的视口溢出问题，兼顾降级兜底 */
       min-height: 100dvh;
       min-height: 100vh; 
-      
       margin: 0; 
       padding: 12px; 
-      /* 适配异形屏、刘海屏及底部安全距离 */
       padding-bottom: calc(12px + env(safe-area-inset-bottom));
       padding-left: max(12px, env(safe-area-inset-left));
       padding-right: max(12px, env(safe-area-inset-right));
-      
       display: flex; 
       flex-direction: column; 
       align-items: center; 
@@ -50,99 +41,44 @@
       box-shadow: 0 10px 30px rgba(0,0,0,0.8); 
     }
     
-    .card-header { 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center; 
-      margin-bottom: 10px; 
-    }
-
-    h3 { 
-      margin: 0; 
-      font-size: 13px; 
-      color: #34d399; 
-      font-weight: 600; 
-      letter-spacing: 0.5px; 
-    }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    h3 { margin: 0; font-size: 13px; color: #34d399; font-weight: 600; letter-spacing: 0.5px; }
     
-    .visualizer { 
-      width: 40px; 
-      height: 18px; 
-      background: rgba(0,0,0,0.4); 
-      border-radius: 6px; 
-      display: block; 
-      border: 1px solid rgba(16, 185, 129, 0.25); 
-    }
+    .visualizer { width: 40px; height: 18px; background: rgba(0,0,0,0.4); border-radius: 6px; display: block; border: 1px solid rgba(16, 185, 129, 0.25); }
 
-    .radar-container { 
-      position: relative; 
-      width: 100%; 
-      height: 110px; 
-      background: rgba(0,0,0,0.5); 
-      border-radius: 12px; 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
-      border: 1px solid rgba(16, 185, 129, 0.25); 
-      overflow: hidden; 
-      margin-bottom: 8px; 
-    }
-
+    .radar-container { position: relative; width: 100%; height: 110px; background: rgba(0,0,0,0.5); border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(16, 185, 129, 0.25); overflow: hidden; margin-bottom: 8px; }
     canvas#radarCanvas { display: block; }
 
-    .video-preview-container { 
-      position: relative; 
-      width: 100%; 
-      height: 140px; 
-      background: rgba(0,0,0,0.7); 
-      border-radius: 12px; 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
-      border: 1px solid rgba(16, 185, 129, 0.25); 
-      overflow: hidden; 
-      margin-bottom: 8px; 
-    }
-
-    video { 
-      width: 100%; 
-      height: 100%; 
-      object-fit: contain; 
-      background: #000; 
-      border-radius: 12px; 
-    }
+    .video-preview-container { position: relative; width: 100%; height: 140px; background: rgba(0,0,0,0.7); border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(16, 185, 129, 0.25); overflow: hidden; margin-bottom: 8px; }
+    video { width: 100%; height: 100%; object-fit: contain; background: #000; border-radius: 12px; }
 
     /* ==========================================
-       P1: 移动端表单控件防放大机制
+       P1 优化：仅对文本/选择框做安全规范，绝对不缩放 input[type="file"]
        ========================================== */
-    /* 核心：强制表单控件字体 >= 16px，防止 iOS 自动放大聚焦页面 */
-    input[type="file"], select, button, input[type="range"], input[type="text"] {
-      font-size: 16px !important; 
+    input[type="text"], select, textarea {
+      font-size: 16px; /* 防止 iOS Safari 自动放大 */
     }
 
-    /* 视觉小字需求：使用物理等比缩小（transform scale），确保不触发 iOS 放大机制 */
-    .select-box select, 
-    input[type="file"] {
-      font-size: 16px !important;
-      transform: scale(0.875); /* 视觉效果约等于 14px */
+    .select-box select {
+      font-size: 16px;
+      transform: scale(0.9);
       transform-origin: left center;
     }
 
-    .tip, h3, .slider-header {
-      font-size: 12px; /* 保证基础可读性 */
-    }
+    .tip, h3, .slider-header { font-size: 12px; }
 
     input[type="file"] { 
       width: 100%; 
       margin: 4px 0; 
       color: #a7f3d0; 
+      font-size: 14px; /* 恢复原生正常大小，确保可点击 */
     }
 
     input[type="file"]::file-selector-button { 
       background: #047857; 
       color: #a7f3d0; 
       border: none; 
-      padding: 6px 12px; 
+      padding: 8px 12px; 
       border-radius: 6px; 
       cursor: pointer; 
       font-weight: 500; 
@@ -160,40 +96,14 @@
       font-weight: 500; 
       transition: all 0.2s ease; 
     }
-    
     button:hover { opacity: 0.9; transform: translateY(-1px); }
     button.off { background: #0c261b; color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.15); }
     button.export-btn { background: #047857; border: 1px solid #34d399; font-weight: 600; }
     button:disabled { opacity: 0.25; transform: none; cursor: not-allowed; }
 
-    .select-box { 
-      background: rgba(16, 185, 129, 0.05); 
-      border: 1px solid rgba(16, 185, 129, 0.25); 
-      border-radius: 12px; 
-      padding: 7px 10px; 
-      margin-top: 6px; 
-      display: flex; 
-      align-items: center; 
-      justify-content: space-between; 
-    }
-
-    .select-box label { 
-      font-size: 11px; 
-      color: #a7f3d0; 
-      font-weight: 500; 
-    }
-
-    .select-box select { 
-      background: #03130a; 
-      color: #34d399; 
-      border: 1px solid rgba(16, 185, 129, 0.4); 
-      padding: 5px 8px; 
-      border-radius: 8px; 
-      outline: none; 
-      width: 58%; 
-      font-weight: 600; 
-      cursor: pointer; 
-    }
+    .select-box { background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 7px 10px; margin-top: 6px; display: flex; align-items: center; justify-content: space-between; }
+    .select-box label { font-size: 11px; color: #a7f3d0; font-weight: 500; }
+    .select-box select { background: #03130a; color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); padding: 5px 8px; border-radius: 8px; outline: none; width: 58%; font-weight: 600; cursor: pointer; }
 
     .dual-slider-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
     .slider-box { background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.15); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
@@ -726,34 +636,28 @@ clearCanvases();
 
 const vFile = document.getElementById('vFile');
 const vElement = document.getElementById('vElement');
-const vPlay = document.getElementById('vPlay');
-const vStop = document.getElementById('vStop');
-const vVol = document.getElementById('vVol');
-const vVolVal = document.getElementById('vVolVal');
-const vStatus = document.getElementById('vStatus');
-
 vFile.addEventListener('change', e => {
   const file = e.target.files[0];
   if (!file) return;
   vElement.src = URL.createObjectURL(file);
-  vPlay.disabled = false;
-  vStop.disabled = false;
-  vStatus.textContent = "✅ 本地视频已被成功载入";
+  document.getElementById('vPlay').disabled = false;
+  document.getElementById('vStop').disabled = false;
+  document.getElementById('vStatus').textContent = "✅ 本地视频已被成功载入";
 });
 
-vPlay.addEventListener('click', () => {
+document.getElementById('vPlay').addEventListener('click', () => {
   vElement.play();
-  vStatus.textContent = "▶ 视频播放中...";
+  document.getElementById('vStatus').textContent = "▶ 视频播放中...";
 });
 
-vStop.addEventListener('click', () => {
+document.getElementById('vStop').addEventListener('click', () => {
   vElement.pause();
   vElement.currentTime = 0;
-  vStatus.textContent = "⏹ 视频播放已停止";
+  document.getElementById('vStatus').textContent = "⏹ 视频播放已停止";
 });
 
-vVol.addEventListener('input', e => {
-  vVolVal.textContent = e.target.value + '%';
+document.getElementById('vVol').addEventListener('input', e => {
+  document.getElementById('vVolVal').textContent = e.target.value + '%';
   vElement.volume = e.target.value / 100;
 });
 </script>
